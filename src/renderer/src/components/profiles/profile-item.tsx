@@ -8,7 +8,8 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
-  Progress
+  Progress,
+  Tooltip
 } from '@nextui-org/react'
 import { calcPercent, calcTraffic } from '@renderer/utils/calc'
 import { IoMdMore, IoMdRefresh } from 'react-icons/io'
@@ -19,6 +20,7 @@ import EditInfoModal from './edit-info-modal'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { openFile } from '@renderer/utils/ipc'
+import { useAppConfig } from '@renderer/hooks/use-app-config'
 
 interface Props {
   info: IProfileItem
@@ -50,6 +52,8 @@ const ProfileItem: React.FC<Props> = (props) => {
   const extra = info?.extra
   const usage = (extra?.upload ?? 0) + (extra?.download ?? 0)
   const total = extra?.total ?? 0
+  const { appConfig, patchAppConfig } = useAppConfig()
+  const { profileDisplayDate = 'expire' } = appConfig || {}
   const [updating, setUpdating] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [openInfoEditor, setOpenInfoEditor] = useState(false)
@@ -179,98 +183,132 @@ const ProfileItem: React.FC<Props> = (props) => {
         }}
         className={`${isCurrent ? 'bg-primary' : ''} ${selecting ? 'blur-sm' : ''}`}
       >
-        <CardBody className="pb-1">
-          <div className="flex justify-between h-[32px]">
-            <h3
-              ref={setNodeRef}
-              {...attributes}
-              {...listeners}
-              title={info?.name}
-              className={`text-ellipsis whitespace-nowrap overflow-hidden text-md font-bold leading-[32px] ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              {info?.name}
-            </h3>
-            <div className="flex">
-              {info.type === 'remote' && (
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="light"
-                  color="default"
-                  title={dayjs(info.updated).fromNow()}
-                  disabled={updating}
-                  onPress={async () => {
-                    setUpdating(true)
-                    await addProfileItem(info)
-                    setUpdating(false)
-                  }}
-                >
-                  <IoMdRefresh
-                    color="default"
-                    className={`${isCurrent ? 'text-white' : 'text-foreground'} text-[24px] ${updating ? 'animate-spin' : ''}`}
-                  />
-                </Button>
-              )}
-
-              <Dropdown>
-                <DropdownTrigger>
-                  <Button isIconOnly size="sm" variant="light" color="default">
-                    <IoMdMore
-                      color="default"
-                      className={`text-[24px] ${isCurrent ? 'text-white' : 'text-foreground'}`}
-                    />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu onAction={onMenuAction}>
-                  {menuItems.map((item) => (
-                    <DropdownItem
-                      showDivider={item.showDivider}
-                      key={item.key}
-                      color={item.color}
-                      className={item.className}
-                    >
-                      {item.label}
-                    </DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-          </div>
-          {info.type === 'remote' && extra && (
-            <div
-              className={`mt-2 flex justify-between ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              <small>{`${calcTraffic(usage)}/${calcTraffic(total)}`}</small>
-              <small>
-                {extra.expire ? dayjs.unix(extra.expire).format('YYYY-MM-DD') : '长期有效'}
-              </small>
-            </div>
-          )}
-          {info.type === 'local' && (
-            <div
-              className={`mt-2 flex justify-between ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              <Chip
-                size="sm"
-                variant="bordered"
-                className={`${isCurrent ? 'text-white border-white' : 'border-primary text-primary'}`}
+        <div ref={setNodeRef} {...attributes} {...listeners} className="w-full h-full">
+          <CardBody className="pb-1">
+            <div className="flex justify-between h-[32px]">
+              <h3
+                title={info?.name}
+                className={`text-ellipsis whitespace-nowrap overflow-hidden text-md font-bold leading-[32px] ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
               >
-                本地
-              </Chip>
+                {info?.name}
+              </h3>
+              <div className="flex">
+                {info.type === 'remote' && (
+                  <Tooltip placement="left" content={dayjs(info.updated).fromNow()}>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="default"
+                      disabled={updating}
+                      onPress={async () => {
+                        setUpdating(true)
+                        await addProfileItem(info)
+                        setUpdating(false)
+                      }}
+                    >
+                      <IoMdRefresh
+                        color="default"
+                        className={`${isCurrent ? 'text-primary-foreground' : 'text-foreground'} text-[24px] ${updating ? 'animate-spin' : ''}`}
+                      />
+                    </Button>
+                  </Tooltip>
+                )}
+
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Button isIconOnly size="sm" variant="light" color="default">
+                      <IoMdMore
+                        color="default"
+                        className={`text-[24px] ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                      />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu onAction={onMenuAction}>
+                    {menuItems.map((item) => (
+                      <DropdownItem
+                        showDivider={item.showDivider}
+                        key={item.key}
+                        color={item.color}
+                        className={item.className}
+                      >
+                        {item.label}
+                      </DropdownItem>
+                    ))}
+                  </DropdownMenu>
+                </Dropdown>
+              </div>
             </div>
-          )}
-        </CardBody>
-        <CardFooter className="pt-0">
-          {extra && (
-            <Progress
-              className="w-full"
-              classNames={{
-                indicator: isCurrent ? 'bg-white' : 'bg-foreground'
-              }}
-              value={calcPercent(extra?.upload, extra?.download, extra?.total)}
-            />
-          )}
-        </CardFooter>
+            {info.type === 'remote' && extra && (
+              <div
+                className={`mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <small>{`${calcTraffic(usage)}/${calcTraffic(total)}`}</small>
+                {profileDisplayDate === 'expire' ? (
+                  <Button
+                    size="sm"
+                    variant="light"
+                    className={`h-[20px] p-1 m-0 ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                    onPress={async () => {
+                      await patchAppConfig({ profileDisplayDate: 'update' })
+                    }}
+                  >
+                    {extra.expire ? dayjs.unix(extra.expire).format('YYYY-MM-DD') : '长期有效'}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="light"
+                    className={`h-[20px] p-1 m-0 ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                    onPress={async () => {
+                      await patchAppConfig({ profileDisplayDate: 'expire' })
+                    }}
+                  >
+                    {dayjs(info.updated).fromNow()}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardBody>
+          <CardFooter className="pt-0">
+            {info.type === 'remote' && !extra && (
+              <div
+                className={`w-full mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <Chip
+                  size="sm"
+                  variant="bordered"
+                  className={`${isCurrent ? 'text-primary-foreground border-primary-foreground' : 'border-primary text-primary'}`}
+                >
+                  远程
+                </Chip>
+                <small>{dayjs(info.updated).fromNow()}</small>
+              </div>
+            )}
+            {info.type === 'local' && (
+              <div
+                className={`mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <Chip
+                  size="sm"
+                  variant="bordered"
+                  className={`${isCurrent ? 'text-primary-foreground border-primary-foreground' : 'border-primary text-primary'}`}
+                >
+                  本地
+                </Chip>
+              </div>
+            )}
+            {extra && (
+              <Progress
+                className="w-full"
+                classNames={{
+                  indicator: isCurrent ? 'bg-primary-foreground' : 'bg-foreground'
+                }}
+                value={calcPercent(extra?.upload, extra?.download, extra?.total)}
+              />
+            )}
+          </CardFooter>
+        </div>
       </Card>
     </div>
   )

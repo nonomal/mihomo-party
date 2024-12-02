@@ -1,5 +1,5 @@
-import { app, globalShortcut, ipcMain } from 'electron'
-import { mainWindow, showMainWindow } from '..'
+import { app, globalShortcut, ipcMain, Notification } from 'electron'
+import { mainWindow, triggerMainWindow } from '..'
 import {
   getAppConfig,
   getControledMihomoConfig,
@@ -8,7 +8,8 @@ import {
 } from '../config'
 import { triggerSysProxy } from '../sys/sysproxy'
 import { patchMihomoConfig } from '../core/mihomoApi'
-import { quitWithoutCore } from '../core/manager'
+import { quitWithoutCore, restartCore } from '../core/manager'
+import { floatingWindow, triggerFloatingWindow } from './floatingWindow'
 
 export async function registerShortcut(
   oldShortcut: string,
@@ -24,11 +25,12 @@ export async function registerShortcut(
   switch (action) {
     case 'showWindowShortcut': {
       return globalShortcut.register(newShortcut, () => {
-        if (mainWindow?.isVisible()) {
-          mainWindow?.close()
-        } else {
-          showMainWindow()
-        }
+        triggerMainWindow()
+      })
+    }
+    case 'showFloatingWindowShortcut': {
+      return globalShortcut.register(newShortcut, async () => {
+        await triggerFloatingWindow()
       })
     }
     case 'triggerSysProxyShortcut': {
@@ -39,10 +41,14 @@ export async function registerShortcut(
         try {
           await triggerSysProxy(!enable)
           await patchAppConfig({ sysProxy: { enable: !enable } })
+          new Notification({
+            title: `系统代理已${!enable ? '开启' : '关闭'}`
+          }).show()
+          mainWindow?.webContents.send('appConfigUpdated')
+          floatingWindow?.webContents.send('appConfigUpdated')
         } catch {
           // ignore
         } finally {
-          mainWindow?.webContents.send('appConfigUpdated')
           ipcMain.emit('updateTrayMenu')
         }
       })
@@ -51,16 +57,32 @@ export async function registerShortcut(
       return globalShortcut.register(newShortcut, async () => {
         const { tun } = await getControledMihomoConfig()
         const enable = tun?.enable ?? false
-        await patchControledMihomoConfig({ tun: { enable: !enable } })
-        await patchMihomoConfig({ tun: { enable: !enable } })
-        mainWindow?.webContents.send('controledMihomoConfigUpdated')
-        ipcMain.emit('updateTrayMenu')
+        try {
+          if (!enable) {
+            await patchControledMihomoConfig({ tun: { enable: !enable }, dns: { enable: true } })
+          } else {
+            await patchControledMihomoConfig({ tun: { enable: !enable } })
+          }
+          await restartCore()
+          new Notification({
+            title: `虚拟网卡已${!enable ? '开启' : '关闭'}`
+          }).show()
+          mainWindow?.webContents.send('controledMihomoConfigUpdated')
+          floatingWindow?.webContents.send('appConfigUpdated')
+        } catch {
+          // ignore
+        } finally {
+          ipcMain.emit('updateTrayMenu')
+        }
       })
     }
     case 'ruleModeShortcut': {
       return globalShortcut.register(newShortcut, async () => {
         await patchControledMihomoConfig({ mode: 'rule' })
         await patchMihomoConfig({ mode: 'rule' })
+        new Notification({
+          title: '已切换至规则模式'
+        }).show()
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
         ipcMain.emit('updateTrayMenu')
       })
@@ -69,6 +91,9 @@ export async function registerShortcut(
       return globalShortcut.register(newShortcut, async () => {
         await patchControledMihomoConfig({ mode: 'global' })
         await patchMihomoConfig({ mode: 'global' })
+        new Notification({
+          title: '已切换至全局模式'
+        }).show()
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
         ipcMain.emit('updateTrayMenu')
       })
@@ -77,6 +102,9 @@ export async function registerShortcut(
       return globalShortcut.register(newShortcut, async () => {
         await patchControledMihomoConfig({ mode: 'direct' })
         await patchMihomoConfig({ mode: 'direct' })
+        new Notification({
+          title: '已切换至直连模式'
+        }).show()
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
         ipcMain.emit('updateTrayMenu')
       })
@@ -98,6 +126,7 @@ export async function registerShortcut(
 
 export async function initShortcut(): Promise<void> {
   const {
+    showFloatingWindowShortcut,
     showWindowShortcut,
     triggerSysProxyShortcut,
     triggerTunShortcut,
@@ -110,6 +139,13 @@ export async function initShortcut(): Promise<void> {
   if (showWindowShortcut) {
     try {
       await registerShortcut('', showWindowShortcut, 'showWindowShortcut')
+    } catch {
+      // ignore
+    }
+  }
+  if (showFloatingWindowShortcut) {
+    try {
+      await registerShortcut('', showFloatingWindowShortcut, 'showFloatingWindowShortcut')
     } catch {
       // ignore
     }

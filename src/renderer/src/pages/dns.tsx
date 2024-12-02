@@ -28,11 +28,13 @@ const DNS: React.FC = () => {
     'use-hosts': useHosts = false,
     'use-system-hosts': useSystemHosts = false,
     'respect-rules': respectRules = false,
+    'default-nameserver': defaultNameserver = ['tls://223.5.5.5'],
     nameserver = ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
     'proxy-server-nameserver': proxyServerNameserver = [
       'https://doh.pub/dns-query',
       'https://dns.alidns.com/dns-query'
-    ]
+    ],
+    'direct-nameserver': directNameserver = []
   } = dns || {}
   const [changed, setChanged] = useState(false)
   const [values, originSetValues] = useState({
@@ -43,8 +45,10 @@ const DNS: React.FC = () => {
     fakeIPFilter,
     useSystemHosts,
     respectRules,
+    defaultNameserver,
     nameserver,
     proxyServerNameserver,
+    directNameserver,
     useNameserverPolicy,
     nameserverPolicy: Object.entries(nameserverPolicy || {}).map(([domain, value]) => ({
       domain,
@@ -147,10 +151,12 @@ const DNS: React.FC = () => {
                 'use-hosts': values.useHosts,
                 'use-system-hosts': values.useSystemHosts,
                 'respect-rules': values.respectRules,
+                'default-nameserver': values.defaultNameserver,
                 nameserver: values.nameserver,
                 'proxy-server-nameserver': values.proxyServerNameserver,
-                fallback: [],
-                'fallback-filter': {}
+                'direct-nameserver': values.directNameserver,
+                fallback: undefined,
+                'fallback-filter': undefined
               }
               if (values.useNameserverPolicy) {
                 dnsConfig['nameserver-policy'] = Object.fromEntries(
@@ -195,7 +201,7 @@ const DNS: React.FC = () => {
             </SettingItem>
             <div className="flex flex-col items-stretch">
               <h3>真实 IP 回应</h3>
-              {renderListInputs('fakeIPFilter', '例: +.lan')}
+              {renderListInputs('fakeIPFilter', '例：+.lan')}
             </div>
             <Divider className="my-2" />
           </>
@@ -209,7 +215,7 @@ const DNS: React.FC = () => {
             }}
           />
         </SettingItem>
-        <SettingItem title="连接遵守规则" divider>
+        <SettingItem title="遵守规则" divider>
           <Switch
             size="sm"
             isSelected={values.respectRules}
@@ -220,13 +226,23 @@ const DNS: React.FC = () => {
         </SettingItem>
 
         <div className="flex flex-col items-stretch">
-          <h3>代理节点域名解析</h3>
-          {renderListInputs('proxyServerNameserver', '例: tls://223.5.5.5')}
+          <h3>DNS 服务器域名解析</h3>
+          {renderListInputs('defaultNameserver', '例：223.5.5.5，仅支持 IP')}
         </div>
         <Divider className="my-2" />
         <div className="flex flex-col items-stretch">
-          <h3>DNS 服务器</h3>
-          {renderListInputs('nameserver', '例: tls://223.5.5.5')}
+          <h3>代理服务器域名解析</h3>
+          {renderListInputs('proxyServerNameserver', '例：tls://dns.alidns.com')}
+        </div>
+        <Divider className="my-2" />
+        <div className="flex flex-col items-stretch">
+          <h3>默认解析服务器</h3>
+          {renderListInputs('nameserver', '例：tls://dns.alidns.com')}
+        </div>
+        <Divider className="my-2" />
+        <div className="flex flex-col items-stretch">
+          <h3>直连解析服务器</h3>
+          {renderListInputs('directNameserver', '例：tls://dns.alidns.com')}
         </div>
         <Divider className="my-2" />
         <SettingItem title="覆盖DNS策略" divider>

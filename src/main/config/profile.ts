@@ -1,21 +1,24 @@
 import { getControledMihomoConfig } from './controledMihomo'
-import { profileConfigPath, profilePath } from '../utils/dirs'
+import { mihomoProfileWorkDir, mihomoWorkDir, profileConfigPath, profilePath } from '../utils/dirs'
 import { addProfileUpdater } from '../core/profileUpdater'
 import { readFile, rm, writeFile } from 'fs/promises'
 import { restartCore } from '../core/manager'
 import { getAppConfig } from './app'
 import { existsSync } from 'fs'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import yaml from 'yaml'
 import { defaultProfile } from '../utils/template'
+import { subStorePort } from '../resolve/server'
+import { join } from 'path'
 
 let profileConfig: IProfileConfig // profile.yaml
 
 export async function getProfileConfig(force = false): Promise<IProfileConfig> {
   if (force || !profileConfig) {
     const data = await readFile(profileConfigPath(), 'utf-8')
-    profileConfig = yaml.parse(data)
+    profileConfig = yaml.parse(data, { merge: true }) || { items: [] }
   }
+  if (typeof profileConfig !== 'object') profileConfig = { items: [] }
   return profileConfig
 }
 
@@ -90,6 +93,9 @@ export async function removeProfileItem(id: string): Promise<void> {
   if (shouldRestart) {
     await restartCore()
   }
+  if (existsSync(mihomoProfileWorkDir(id))) {
+    await rm(mihomoProfileWorkDir(id), { recursive: true })
+  }
 }
 
 export async function getCurrentProfileItem(): Promise<IProfileItem> {
@@ -104,6 +110,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
     name: item.name || (item.type === 'remote' ? 'Remote File' : 'Local File'),
     type: item.type,
     url: item.url,
+    substore: item.substore || false,
     interval: item.interval || 0,
     override: item.override || [],
     useProxy: item.useProxy || false,
@@ -114,18 +121,38 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
       const { userAgent } = await getAppConfig()
       const { 'mixed-port': mixedPort = 7890 } = await getControledMihomoConfig()
       if (!item.url) throw new Error('Empty URL')
-      const res = await axios.get(item.url, {
-        proxy: newItem.useProxy
-          ? {
-              protocol: 'http',
-              host: '127.0.0.1',
-              port: mixedPort
-            }
-          : false,
-        headers: {
-          'User-Agent': userAgent || 'clash.meta'
+      let res: AxiosResponse
+      if (newItem.substore) {
+        const urlObj = new URL(`http://127.0.0.1:${subStorePort}${item.url}`)
+        urlObj.searchParams.set('target', 'ClashMeta')
+        urlObj.searchParams.set('noCache', 'true')
+        if (newItem.useProxy) {
+          urlObj.searchParams.set('proxy', `http://127.0.0.1:${mixedPort}`)
+        } else {
+          urlObj.searchParams.delete('proxy')
         }
-      })
+        res = await axios.get(urlObj.toString(), {
+          headers: {
+            'User-Agent': userAgent || 'clash.meta'
+          },
+          responseType: 'text'
+        })
+      } else {
+        res = await axios.get(item.url, {
+          proxy: newItem.useProxy
+            ? {
+                protocol: 'http',
+                host: '127.0.0.1',
+                port: mixedPort
+              }
+            : false,
+          headers: {
+            'User-Agent': userAgent || 'clash.meta'
+          },
+          responseType: 'text'
+        })
+      }
+
       const data = res.data
       const headers = res.headers
       if (headers['content-disposition'] && newItem.name === 'Remote File') {
@@ -168,7 +195,9 @@ export async function setProfileStr(id: string, content: string): Promise<void> 
 
 export async function getProfile(id: string | undefined): Promise<IMihomoConfig> {
   const profile = await getProfileStr(id)
-  return yaml.parse(profile) || {}
+  let result = yaml.parse(profile, { merge: true }) || {}
+  if (typeof result !== 'object') result = {}
+  return result
 }
 
 // attachment;filename=xxx.yaml; filename*=UTF-8''%xx%xx%xx
@@ -191,4 +220,35 @@ function parseSubinfo(str: string): ISubscriptionUserInfo {
     obj[key] = parseInt(value)
   })
   return obj
+}
+
+function isAbsolutePath(path: string): boolean {
+  return path.startsWith('/') || /^[a-zA-Z]:\\/.test(path)
+}
+
+export async function getFileStr(path: string): Promise<string> {
+  const { diffWorkDir = false } = await getAppConfig()
+  const { current } = await getProfileConfig()
+  if (isAbsolutePath(path)) {
+    return await readFile(path, 'utf-8')
+  } else {
+    return await readFile(
+      join(diffWorkDir ? mihomoProfileWorkDir(current) : mihomoWorkDir(), path),
+      'utf-8'
+    )
+  }
+}
+
+export async function setFileStr(path: string, content: string): Promise<void> {
+  const { diffWorkDir = false } = await getAppConfig()
+  const { current } = await getProfileConfig()
+  if (isAbsolutePath(path)) {
+    await writeFile(path, content, 'utf-8')
+  } else {
+    await writeFile(
+      join(diffWorkDir ? mihomoProfileWorkDir(current) : mihomoWorkDir(), path),
+      content,
+      'utf-8'
+    )
+  }
 }

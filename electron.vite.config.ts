@@ -22,6 +22,14 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          floating: resolve('src/renderer/floating.html')
+        }
+      }
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src')
@@ -30,7 +38,7 @@ export default defineConfig({
     plugins: [
       react(),
       monacoEditorPlugin({
-        languageWorkers: ['editorWorkerService', 'typescript', 'json'],
+        languageWorkers: ['editorWorkerService', 'typescript', 'css'],
         customDistPath: (_, out) => `${out}/monacoeditorwork`,
         customWorkers: [
           {

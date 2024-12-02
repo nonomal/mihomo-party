@@ -9,6 +9,7 @@ import Actions from '@renderer/components/settings/actions'
 import ShortcutConfig from '@renderer/components/settings/shortcut-config'
 import { FaTelegramPlane } from 'react-icons/fa'
 import SiderConfig from '@renderer/components/settings/sider-config'
+import SubStoreConfig from '@renderer/components/settings/substore-config'
 
 const Settings: React.FC = () => {
   return (
@@ -35,7 +36,7 @@ const Settings: React.FC = () => {
             className="app-nodrag"
             title="GitHub 仓库"
             onPress={() => {
-              window.open('https://github.com/pompurin404/mihomo-party')
+              window.open('https://github.com/mihomo-party-org/mihomo-party')
             }}
           >
             <IoLogoGithub className="text-lg" />
@@ -47,7 +48,7 @@ const Settings: React.FC = () => {
             className="app-nodrag"
             title="Telegram 群组"
             onPress={() => {
-              window.open('https://t.me/mihomo_party')
+              window.open('https://t.me/mihomo_party_group')
             }}
           >
             <FaTelegramPlane className="text-lg" />
@@ -56,6 +57,7 @@ const Settings: React.FC = () => {
       }
     >
       <GeneralConfig />
+      <SubStoreConfig />
       <SiderConfig />
       <WebdavConfig />
       <MihomoConfig />

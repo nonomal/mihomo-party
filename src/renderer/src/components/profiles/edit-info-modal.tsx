@@ -6,14 +6,19 @@ import {
   ModalFooter,
   Button,
   Input,
-  Select,
-  SelectItem,
-  Switch
+  Switch,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem
 } from '@nextui-org/react'
 import React, { useState } from 'react'
 import SettingItem from '../base/base-setting-item'
 import { useOverrideConfig } from '@renderer/hooks/use-override-config'
 import { restartCore } from '@renderer/utils/ipc'
+import { MdDeleteForever } from 'react-icons/md'
+import { FaPlus } from 'react-icons/fa6'
+
 interface Props {
   item: IProfileItem
   updateProfileItem: (item: IProfileItem) => Promise<void>
@@ -27,7 +32,13 @@ const EditInfoModal: React.FC<Props> = (props) => {
 
   const onSave = async (): Promise<void> => {
     try {
-      await updateProfileItem(values)
+      await updateProfileItem({
+        ...values,
+        override: values.override?.filter(
+          (i) =>
+            overrideItems.find((t) => t.id === i) && !overrideItems.find((t) => t.id === i)?.global
+        )
+      })
       await restartCore()
       onClose()
     } catch (e) {
@@ -45,7 +56,7 @@ const EditInfoModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">编辑信息</ModalHeader>
+        <ModalHeader className="flex app-drag">编辑信息</ModalHeader>
         <ModalBody>
           <SettingItem title="名称">
             <Input
@@ -92,31 +103,73 @@ const EditInfoModal: React.FC<Props> = (props) => {
             </>
           )}
           <SettingItem title="覆写">
-            <Select
-              className="w-[200px]"
-              size="sm"
-              selectionMode="multiple"
-              selectedKeys={new Set(values.override || [])}
-              onSelectionChange={(v) => {
-                setValues({
-                  ...values,
-                  override: Array.from(v)
-                    .map((i) => i.toString())
-                    .filter((i) => overrideItems.find((t) => t.id === i))
-                })
-              }}
-            >
-              {overrideItems.map((i) => (
-                <SelectItem key={i.id}>{i.name}</SelectItem>
-              ))}
-            </Select>
+            <div>
+              {overrideItems
+                .filter((i) => i.global)
+                .map((i) => {
+                  return (
+                    <div className="flex mb-2" key={i.id}>
+                      <Button disabled fullWidth variant="flat" size="sm">
+                        {i.name} (全局)
+                      </Button>
+                    </div>
+                  )
+                })}
+              {values.override?.map((i) => {
+                if (!overrideItems.find((t) => t.id === i)) return null
+                if (overrideItems.find((t) => t.id === i)?.global) return null
+                return (
+                  <div className="flex mb-2" key={i}>
+                    <Button disabled fullWidth variant="flat" size="sm">
+                      {overrideItems.find((t) => t.id === i)?.name}
+                    </Button>
+                    <Button
+                      color="warning"
+                      variant="flat"
+                      className="ml-2"
+                      size="sm"
+                      onPress={() => {
+                        setValues({
+                          ...values,
+                          override: values.override?.filter((t) => t !== i)
+                        })
+                      }}
+                    >
+                      <MdDeleteForever className="text-lg" />
+                    </Button>
+                  </div>
+                )
+              })}
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button fullWidth size="sm" variant="flat" color="default">
+                    <FaPlus />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  emptyContent="没有可用的覆写"
+                  onAction={(key) => {
+                    setValues({
+                      ...values,
+                      override: Array.from(values.override || []).concat(key.toString())
+                    })
+                  }}
+                >
+                  {overrideItems
+                    .filter((i) => !values.override?.includes(i.id) && !i.global)
+                    .map((i) => (
+                      <DropdownItem key={i.id}>{i.name}</DropdownItem>
+                    ))}
+                </DropdownMenu>
+              </Dropdown>
+            </div>
           </SettingItem>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
+          <Button size="sm" variant="light" onPress={onClose}>
             取消
           </Button>
-          <Button color="primary" onPress={onSave}>
+          <Button size="sm" color="primary" onPress={onSave}>
             保存
           </Button>
         </ModalFooter>

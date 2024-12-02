@@ -9,21 +9,21 @@ import { useAppConfig } from '@renderer/hooks/use-app-config'
 
 const WebdavConfig: React.FC = () => {
   const { appConfig, patchAppConfig } = useAppConfig()
-  const { webdavUrl, webdavUsername, webdavPassword } = appConfig || {}
+  const { webdavUrl, webdavUsername, webdavPassword, webdavDir = 'mihomo-party' } = appConfig || {}
   const [backuping, setBackuping] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [filenames, setFilenames] = useState<string[]>([])
   const [restoreOpen, setRestoreOpen] = useState(false)
 
-  const [webdav, setWebdav] = useState({ webdavUrl, webdavUsername, webdavPassword })
-  const setWebdavDebounce = debounce(({ webdavUrl, webdavUsername, webdavPassword }) => {
-    patchAppConfig({ webdavUrl, webdavUsername, webdavPassword })
+  const [webdav, setWebdav] = useState({ webdavUrl, webdavUsername, webdavPassword, webdavDir })
+  const setWebdavDebounce = debounce(({ webdavUrl, webdavUsername, webdavPassword, webdavDir }) => {
+    patchAppConfig({ webdavUrl, webdavUsername, webdavPassword, webdavDir })
   }, 500)
   const handleBackup = async (): Promise<void> => {
     setBackuping(true)
     try {
       await webdavBackup()
-      new window.Notification('备份成功', { body: '备份文件已上传至 WebDav' })
+      new window.Notification('备份成功', { body: '备份文件已上传至 WebDAV' })
     } catch (e) {
       alert(e)
     } finally {
@@ -48,8 +48,8 @@ const WebdavConfig: React.FC = () => {
       {restoreOpen && (
         <WebdavRestoreModal filenames={filenames} onClose={() => setRestoreOpen(false)} />
       )}
-      <SettingCard title="WebDav 备份">
-        <SettingItem title="WebDav 地址" divider>
+      <SettingCard title="WebDAV 备份">
+        <SettingItem title="WebDAV 地址" divider>
           <Input
             size="sm"
             className="w-[60%]"
@@ -60,7 +60,18 @@ const WebdavConfig: React.FC = () => {
             }}
           />
         </SettingItem>
-        <SettingItem title="WebDav 用户名" divider>
+        <SettingItem title="WebDAV 备份目录" divider>
+          <Input
+            size="sm"
+            className="w-[60%]"
+            value={webdav.webdavDir}
+            onValueChange={(v) => {
+              setWebdav({ ...webdav, webdavDir: v })
+              setWebdavDebounce({ ...webdav, webdavDir: v })
+            }}
+          />
+        </SettingItem>
+        <SettingItem title="WebDAV 用户名" divider>
           <Input
             size="sm"
             className="w-[60%]"
@@ -71,7 +82,7 @@ const WebdavConfig: React.FC = () => {
             }}
           />
         </SettingItem>
-        <SettingItem title="WebDav 密码" divider>
+        <SettingItem title="WebDAV 密码" divider>
           <Input
             size="sm"
             className="w-[60%]"

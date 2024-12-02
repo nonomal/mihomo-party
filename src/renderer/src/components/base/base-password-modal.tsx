@@ -21,15 +21,15 @@ const BasePasswordModal: React.FC<Props> = (props) => {
   return (
     <Modal backdrop="blur" classNames={{ backdrop: 'top-[48px]' }} hideCloseButton isOpen={true}>
       <ModalContent>
-        <ModalHeader className="flex">请输入root密码</ModalHeader>
+        <ModalHeader className="flex app-drag">请输入root密码</ModalHeader>
         <ModalBody>
           <Input fullWidth type="password" value={password} onValueChange={setPassword} />
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onCancel}>
+          <Button size="sm" variant="light" onPress={onCancel}>
             取消
           </Button>
-          <Button color="primary" onPress={() => onConfirm(password)}>
+          <Button size="sm" color="primary" onPress={() => onConfirm(password)}>
             确认
           </Button>
         </ModalFooter>

@@ -10,8 +10,9 @@ let overrideConfig: IOverrideConfig // override.yaml
 export async function getOverrideConfig(force = false): Promise<IOverrideConfig> {
   if (force || !overrideConfig) {
     const data = await readFile(overrideConfigPath(), 'utf-8')
-    overrideConfig = yaml.parse(data) || {}
+    overrideConfig = yaml.parse(data, { merge: true }) || { items: [] }
   }
+  if (typeof overrideConfig !== 'object') overrideConfig = { items: [] }
   return overrideConfig
 }
 
@@ -62,6 +63,7 @@ export async function createOverride(item: Partial<IOverrideItem>): Promise<IOve
     type: item.type,
     ext: item.ext || 'js',
     url: item.url,
+    global: item.global || false,
     updated: new Date().getTime()
   } as IOverrideItem
   switch (newItem.type) {
@@ -73,7 +75,8 @@ export async function createOverride(item: Partial<IOverrideItem>): Promise<IOve
           protocol: 'http',
           host: '127.0.0.1',
           port: mixedPort
-        }
+        },
+        responseType: 'text'
       })
       const data = res.data
       await setOverride(id, newItem.ext, data)

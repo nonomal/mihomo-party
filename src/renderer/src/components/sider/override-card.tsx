@@ -1,15 +1,21 @@
-import { Button, Card, CardBody, CardFooter } from '@nextui-org/react'
+import { Button, Card, CardBody, CardFooter, Tooltip } from '@nextui-org/react'
 import React from 'react'
 import { MdFormatOverline } from 'react-icons/md'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 
-const OverrideCard: React.FC = () => {
+interface Props {
+  iconOnly?: boolean
+}
+
+const OverrideCard: React.FC<Props> = (props) => {
   const { appConfig } = useAppConfig()
+  const { iconOnly } = props
   const { overrideCardStatus = 'col-span-1' } = appConfig || {}
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/override')
   const {
     attributes,
@@ -22,6 +28,25 @@ const OverrideCard: React.FC = () => {
     id: 'override'
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
+  if (iconOnly) {
+    return (
+      <div className={`${overrideCardStatus} flex justify-center`}>
+        <Tooltip content="覆写" placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/override')
+            }}
+          >
+            <MdFormatOverline className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -30,7 +55,7 @@ const OverrideCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={overrideCardStatus}
+      className={`${overrideCardStatus} override-card`}
     >
       <Card
         fullWidth
@@ -49,13 +74,17 @@ const OverrideCard: React.FC = () => {
             >
               <MdFormatOverline
                 color="default"
-                className={`${match ? 'text-white' : 'text-foreground'} text-[24px]`}
+                className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px]`}
               />
             </Button>
           </div>
         </CardBody>
         <CardFooter className="pt-1">
-          <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>覆写</h3>
+          <h3
+            className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+          >
+            覆写
+          </h3>
         </CardFooter>
       </Card>
     </div>

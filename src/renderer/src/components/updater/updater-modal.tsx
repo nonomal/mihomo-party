@@ -37,14 +37,14 @@ const UpdaterModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent className="h-full w-[calc(100%-100px)]">
-        <ModalHeader className="flex justify-between">
+        <ModalHeader className="flex justify-between app-drag">
           <div>v{version} 版本就绪</div>
           <Button
             color="primary"
             size="sm"
-            className="flex"
+            className="flex app-nodrag"
             onPress={() => {
-              open(`https://github.com/pompurin404/mihomo-party/releases/tag/v${version}`)
+              open(`https://github.com/mihomo-party-org/mihomo-party/releases/tag/v${version}`)
             }}
           >
             前往下载
@@ -54,6 +54,7 @@ const UpdaterModal: React.FC<Props> = (props) => {
           <ReactMarkdown
             className="markdown-body select-text"
             components={{
+              a: ({ ...props }) => <a target="_blank" className="text-primary" {...props} />,
               code: ({ children }) => <Code size="sm">{children}</Code>,
               h3: ({ ...props }) => <h3 className="text-lg font-bold" {...props} />,
               li: ({ children }) => <li className="list-disc list-inside">{children}</li>
@@ -63,10 +64,11 @@ const UpdaterModal: React.FC<Props> = (props) => {
           </ReactMarkdown>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
+          <Button size="sm" variant="light" onPress={onClose}>
             取消
           </Button>
           <Button
+            size="sm"
             color="primary"
             isLoading={downloading}
             onPress={async () => {

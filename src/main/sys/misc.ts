@@ -1,9 +1,10 @@
-import { exec, execFile, execSync } from 'child_process'
-import { dialog, nativeTheme, shell } from 'electron'
+import { exec, execFile, execSync, spawn } from 'child_process'
+import { app, dialog, nativeTheme, shell } from 'electron'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { promisify } from 'util'
 import {
+  dataDir,
   exePath,
   mihomoCorePath,
   overridePath,
@@ -66,10 +67,6 @@ export function setNativeTheme(theme: 'system' | 'light' | 'dark'): void {
 
 const elevateTaskXml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo>
-    <Date>${new Date().toISOString()}</Date>
-    <Author>${process.env.USERNAME}</Author>
-  </RegistrationInfo>
   <Triggers />
   <Principals>
     <Principal id="Author">
@@ -93,8 +90,8 @@ const elevateTaskXml = `<?xml version="1.0" encoding="UTF-16"?>
     <Hidden>false</Hidden>
     <RunOnlyIfIdle>false</RunOnlyIfIdle>
     <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>
-    <Priority>7</Priority>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>3</Priority>
   </Settings>
   <Actions Context="Author">
     <Exec>
@@ -108,9 +105,41 @@ const elevateTaskXml = `<?xml version="1.0" encoding="UTF-16"?>
 export function createElevateTask(): void {
   const taskFilePath = path.join(taskDir(), `mihomo-party-run.xml`)
   writeFileSync(taskFilePath, Buffer.from(`\ufeff${elevateTaskXml}`, 'utf-16le'))
-  execSync(`schtasks /create /tn "mihomo-party-run" /xml "${taskFilePath}" /f`)
   copyFileSync(
     path.join(resourcesFilesDir(), 'mihomo-party-run.exe'),
     path.join(taskDir(), 'mihomo-party-run.exe')
   )
+  execSync(
+    `%SystemRoot%\\System32\\schtasks.exe /create /tn "mihomo-party-run" /xml "${taskFilePath}" /f`
+  )
+}
+
+export function resetAppConfig(): void {
+  if (process.platform === 'win32') {
+    spawn(
+      'cmd',
+      [
+        '/C',
+        `"timeout /t 2 /nobreak >nul && rmdir /s /q "${dataDir()}" && start "" "${exePath()}""`
+      ],
+      {
+        shell: true,
+        detached: true
+      }
+    ).unref()
+  } else {
+    const script = `while kill -0 ${process.pid} 2>/dev/null; do
+  sleep 0.1
+done
+  rm -rf '${dataDir()}'
+  ${process.argv.join(' ')} & disown
+exit
+`
+    spawn('sh', ['-c', `"${script}"`], {
+      shell: true,
+      detached: true,
+      stdio: 'ignore'
+    })
+  }
+  app.quit()
 }

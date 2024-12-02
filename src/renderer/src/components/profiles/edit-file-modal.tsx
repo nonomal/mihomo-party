@@ -31,15 +31,16 @@ const EditFileModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent className="h-full w-[calc(100%-100px)]">
-        <ModalHeader className="flex pb-0">
+        <ModalHeader className="flex pb-0 app-drag">
           <div className="flex justify-start">
             <div className="flex items-center">编辑订阅</div>
-            <small className="ml-2 text-default-500">
+            <small className="ml-2 text-foreground-500">
               注意：此处编辑配置更新订阅后会还原，如需要自定义配置请使用
               <Button
                 size="sm"
                 color="primary"
                 variant="light"
+                className="app-nodrag"
                 onPress={() => {
                   navigate('/override')
                 }}

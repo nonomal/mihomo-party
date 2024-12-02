@@ -13,13 +13,7 @@ import BasePage from '@renderer/components/base/base-page'
 import ProfileItem from '@renderer/components/profiles/profile-item'
 import { useProfileConfig } from '@renderer/hooks/use-profile-config'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
-import {
-  getFilePath,
-  readTextFile,
-  subStoreCollections,
-  subStorePort,
-  subStoreSubs
-} from '@renderer/utils/ipc'
+import { getFilePath, readTextFile, subStoreCollections, subStoreSubs } from '@renderer/utils/ipc'
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { MdContentPaste } from 'react-icons/md'
 import {
@@ -194,43 +188,31 @@ const Profiles: React.FC = () => {
       ref={pageRef}
       title="订阅管理"
       header={
-        <>
-          <Button
-            size="sm"
-            variant="light"
-            className="app-nodrag"
-            onPress={async () => {
-              open('https://mihomo.party/ads/airport/')
-            }}
-          >
-            订阅推荐
-          </Button>
-          <Button
-            size="sm"
-            title="更新全部订阅"
-            className="app-nodrag"
-            variant="light"
-            isIconOnly
-            onPress={async () => {
-              setUpdating(true)
-              for (const item of items) {
-                if (item.id === current) continue
-                if (item.type !== 'remote') continue
-                await addProfileItem(item)
-              }
-              const currentItem = items.find((item) => item.id === current)
-              if (currentItem && currentItem.type === 'remote') {
-                await addProfileItem(currentItem)
-              }
-              setUpdating(false)
-            }}
-          >
-            <IoMdRefresh className={`text-lg ${updating ? 'animate-spin' : ''}`} />
-          </Button>
-        </>
+        <Button
+          size="sm"
+          title="更新全部订阅"
+          className="app-nodrag"
+          variant="light"
+          isIconOnly
+          onPress={async () => {
+            setUpdating(true)
+            for (const item of items) {
+              if (item.id === current) continue
+              if (item.type !== 'remote') continue
+              await addProfileItem(item)
+            }
+            const currentItem = items.find((item) => item.id === current)
+            if (currentItem && currentItem.type === 'remote') {
+              await addProfileItem(currentItem)
+            }
+            setUpdating(false)
+          }}
+        >
+          <IoMdRefresh className={`text-lg ${updating ? 'animate-spin' : ''}`} />
+        </Button>
       }
     >
-      <div className="sticky top-0 z-40 bg-background">
+      <div className="sticky profiles-sticky top-0 z-40 bg-background">
         <div className="flex p-2">
           <Input
             size="sm"
@@ -281,8 +263,8 @@ const Profiles: React.FC = () => {
               <DropdownTrigger>
                 <Button
                   isLoading={subStoreImporting}
-                  title="SubStore"
-                  className="ml-2"
+                  title="Sub-Store"
+                  className="ml-2 substore-import"
                   size="sm"
                   isIconOnly
                   color="primary"
@@ -298,16 +280,16 @@ const Profiles: React.FC = () => {
                   } else if (key.toString().startsWith('sub-')) {
                     setSubStoreImporting(true)
                     try {
-                      const port = await subStorePort()
                       const sub = subs.find(
                         (sub) => sub.name === key.toString().replace('sub-', '')
                       )
                       await addProfileItem({
                         name: sub?.displayName || sub?.name || '',
+                        substore: !useCustomSubStore,
                         type: 'remote',
                         url: useCustomSubStore
                           ? `${customSubStoreUrl}/download/${key.toString().replace('sub-', '')}?target=ClashMeta`
-                          : `http://127.0.0.1:${port}/download/${key.toString().replace('sub-', '')}?target=ClashMeta`,
+                          : `/download/${key.toString().replace('sub-', '')}`,
                         useProxy
                       })
                     } catch (e) {
@@ -318,7 +300,6 @@ const Profiles: React.FC = () => {
                   } else if (key.toString().startsWith('collection-')) {
                     setSubStoreImporting(true)
                     try {
-                      const port = await subStorePort()
                       const collection = collections.find(
                         (collection) =>
                           collection.name === key.toString().replace('collection-', '')
@@ -326,9 +307,10 @@ const Profiles: React.FC = () => {
                       await addProfileItem({
                         name: collection?.displayName || collection?.name || '',
                         type: 'remote',
+                        substore: !useCustomSubStore,
                         url: useCustomSubStore
                           ? `${customSubStoreUrl}/download/collection/${key.toString().replace('collection-', '')}?target=ClashMeta`
-                          : `http://127.0.0.1:${port}/download/collection/${key.toString().replace('collection-', '')}?target=ClashMeta`,
+                          : `/download/collection/${key.toString().replace('collection-', '')}`,
                         useProxy
                       })
                     } catch (e) {
@@ -349,7 +331,7 @@ const Profiles: React.FC = () => {
           )}
           <Dropdown>
             <DropdownTrigger>
-              <Button className="ml-2" size="sm" isIconOnly color="primary">
+              <Button className="ml-2 new-profile" size="sm" isIconOnly color="primary">
                 <FaPlus />
               </Button>
             </DropdownTrigger>

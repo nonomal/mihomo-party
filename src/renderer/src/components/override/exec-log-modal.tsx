@@ -35,7 +35,7 @@ const ExecLogModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">执行日志</ModalHeader>
+        <ModalHeader className="flex app-drag">执行日志</ModalHeader>
         <ModalBody>
           {logs.map((log) => {
             return (
@@ -47,7 +47,7 @@ const ExecLogModal: React.FC<Props> = (props) => {
           })}
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
+          <Button size="sm" variant="light" onPress={onClose}>
             关闭
           </Button>
         </ModalFooter>

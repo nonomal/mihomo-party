@@ -6,7 +6,7 @@ interface Props {
   onCancel: () => void
   onConfirm: (script: string) => void
 }
-const PacEditorViewer: React.FC<Props> = (props) => {
+const PacEditorModal: React.FC<Props> = (props) => {
   const { script, onCancel, onConfirm } = props
   const [currData, setCurrData] = useState(script)
 
@@ -21,7 +21,7 @@ const PacEditorViewer: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent className="h-full w-[calc(100%-100px)]">
-        <ModalHeader className="flex pb-0">编辑PAC脚本</ModalHeader>
+        <ModalHeader className="flex pb-0 app-drag">编辑PAC脚本</ModalHeader>
         <ModalBody className="h-full">
           <BaseEditor
             language="javascript"
@@ -42,4 +42,4 @@ const PacEditorViewer: React.FC<Props> = (props) => {
   )
 }
 
-export default PacEditorViewer
+export default PacEditorModal

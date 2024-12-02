@@ -1,27 +1,32 @@
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcMainHandlers } from './utils/ipc'
 import windowStateKeeper from 'electron-window-state'
-import { app, shell, BrowserWindow, Menu, dialog, Notification } from 'electron'
+import { app, shell, BrowserWindow, Menu, dialog, Notification, powerMonitor } from 'electron'
 import { addProfileItem, getAppConfig } from './config'
-import { startCore, stopCore } from './core/manager'
+import { quitWithoutCore, startCore, stopCore } from './core/manager'
 import { triggerSysProxy } from './sys/sysproxy'
 import icon from '../../resources/icon.png?asset'
 import { createTray } from './resolve/tray'
 import { init } from './utils/init'
 import { join } from 'path'
 import { initShortcut } from './resolve/shortcut'
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import { createElevateTask } from './sys/misc'
 import { initProfileUpdater } from './core/profileUpdater'
 import { existsSync, writeFileSync } from 'fs'
-import { taskDir } from './utils/dirs'
+import { exePath, taskDir } from './utils/dirs'
 import path from 'path'
+import { startMonitor } from './resolve/trafficMonitor'
+import { showFloatingWindow } from './resolve/floatingWindow'
+import iconv from 'iconv-lite'
 
+let quitTimeout: NodeJS.Timeout | null = null
 export let mainWindow: BrowserWindow | null = null
-if (process.platform === 'win32' && !is.dev) {
+
+if (process.platform === 'win32' && !is.dev && !process.argv.includes('noadmin')) {
   try {
     createElevateTask()
-  } catch (e) {
+  } catch (createError) {
     try {
       if (process.argv.slice(1).length > 0) {
         writeFileSync(path.join(taskDir(), 'param.txt'), process.argv.slice(1).join(' '))
@@ -31,10 +36,21 @@ if (process.platform === 'win32' && !is.dev) {
       if (!existsSync(path.join(taskDir(), 'mihomo-party-run.exe'))) {
         throw new Error('mihomo-party-run.exe not found')
       } else {
-        execSync('schtasks /run /tn mihomo-party-run')
+        execSync('%SystemRoot%\\System32\\schtasks.exe /run /tn mihomo-party-run')
       }
     } catch (e) {
-      dialog.showErrorBox('首次启动请以管理员权限运行', '首次启动请以管理员权限运行')
+      let createErrorStr = `${createError}`
+      let eStr = `${e}`
+      try {
+        createErrorStr = iconv.decode((createError as { stderr: Buffer }).stderr, 'gbk')
+        eStr = iconv.decode((e as { stderr: Buffer }).stderr, 'gbk')
+      } catch {
+        // ignore
+      }
+      dialog.showErrorBox(
+        '首次启动请以管理员权限运行',
+        `首次启动请以管理员权限运行\n${createErrorStr}\n${eStr}`
+      )
     } finally {
       app.exit()
     }
@@ -45,6 +61,30 @@ const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
   app.quit()
+}
+
+export function customRelaunch(): void {
+  const script = `while kill -0 ${process.pid} 2>/dev/null; do
+  sleep 0.1
+done
+${process.argv.join(' ')} & disown
+exit
+`
+  spawn('sh', ['-c', `"${script}"`], {
+    shell: true,
+    detached: true,
+    stdio: 'ignore'
+  })
+}
+
+if (process.platform === 'linux') {
+  app.relaunch = customRelaunch
+}
+
+if (process.platform === 'win32' && !exePath().startsWith('C')) {
+  // https://github.com/electron/electron/issues/43278
+  // https://github.com/electron/electron/issues/36698
+  app.commandLine.appendSwitch('in-process-gpu')
 }
 
 const initPromise = init()
@@ -61,19 +101,17 @@ app.on('open-url', async (_event, url) => {
   showMainWindow()
   await handleDeepLink(url)
 })
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', (e) => {
+
+app.on('before-quit', async (e) => {
   e.preventDefault()
-  // if (process.platform !== 'darwin') {
-  //   app.quit()
-  // }
+  triggerSysProxy(false)
+  await stopCore()
+  app.exit()
 })
 
-app.on('before-quit', async () => {
-  await stopCore()
+powerMonitor.on('shutdown', async () => {
   triggerSysProxy(false)
+  await stopCore()
   app.exit()
 })
 
@@ -97,6 +135,11 @@ app.whenReady().then(async () => {
   } catch (e) {
     dialog.showErrorBox('内核启动出错', `${e}`)
   }
+  try {
+    await startMonitor()
+  } catch {
+    // ignore
+  }
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -104,9 +147,15 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+  const { showFloatingWindow: showFloating = false, disableTray = false } = await getAppConfig()
   registerIpcMainHandlers()
   await createWindow()
-  await createTray()
+  if (showFloating) {
+    showFloatingWindow()
+  }
+  if (!disableTray) {
+    await createTray()
+  }
   await initShortcut()
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -143,12 +192,14 @@ async function handleDeepLink(url: string): Promise<void> {
 }
 
 export async function createWindow(): Promise<void> {
-  Menu.setApplicationMenu(null)
   const { useWindowFrame = false } = await getAppConfig()
   const mainWindowState = windowStateKeeper({
     defaultWidth: 800,
-    defaultHeight: 600
+    defaultHeight: 600,
+    file: 'window-state.json'
   })
+  // https://github.com/electron/electron/issues/16521#issuecomment-582955104
+  Menu.setApplicationMenu(null)
   mainWindow = new BrowserWindow({
     minWidth: 800,
     minHeight: 600,
@@ -158,6 +209,7 @@ export async function createWindow(): Promise<void> {
     y: mainWindowState.y,
     show: false,
     frame: useWindowFrame,
+    fullscreenable: false,
     titleBarStyle: useWindowFrame ? 'default' : 'hidden',
     titleBarOverlay: useWindowFrame
       ? false
@@ -174,8 +226,23 @@ export async function createWindow(): Promise<void> {
   })
   mainWindowState.manage(mainWindow)
   mainWindow.on('ready-to-show', async () => {
-    const { silentStart } = await getAppConfig()
+    const {
+      silentStart = false,
+      autoQuitWithoutCore = false,
+      autoQuitWithoutCoreDelay = 60
+    } = await getAppConfig()
+    if (autoQuitWithoutCore && !mainWindow?.isVisible()) {
+      if (quitTimeout) {
+        clearTimeout(quitTimeout)
+      }
+      quitTimeout = setTimeout(async () => {
+        await quitWithoutCore()
+      }, autoQuitWithoutCoreDelay * 1000)
+    }
     if (!silentStart) {
+      if (quitTimeout) {
+        clearTimeout(quitTimeout)
+      }
       mainWindow?.show()
       mainWindow?.focusOnWebView()
     }
@@ -184,16 +251,37 @@ export async function createWindow(): Promise<void> {
     mainWindow?.webContents.reload()
   })
 
-  mainWindow.on('close', (event) => {
+  mainWindow.on('close', async (event) => {
     event.preventDefault()
     mainWindow?.hide()
+    const { autoQuitWithoutCore = false, autoQuitWithoutCoreDelay = 60 } = await getAppConfig()
+    if (autoQuitWithoutCore) {
+      if (quitTimeout) {
+        clearTimeout(quitTimeout)
+      }
+      quitTimeout = setTimeout(async () => {
+        await quitWithoutCore()
+      }, autoQuitWithoutCoreDelay * 1000)
+    }
+  })
+
+  mainWindow.on('resized', () => {
+    if (mainWindow) mainWindowState.saveState(mainWindow)
+  })
+
+  mainWindow.on('move', () => {
+    if (mainWindow) mainWindowState.saveState(mainWindow)
+  })
+
+  mainWindow.on('session-end', async () => {
+    triggerSysProxy(false)
+    await stopCore()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -203,9 +291,26 @@ export async function createWindow(): Promise<void> {
   }
 }
 
+export function triggerMainWindow(): void {
+  if (mainWindow?.isVisible()) {
+    closeMainWindow()
+  } else {
+    showMainWindow()
+  }
+}
+
 export function showMainWindow(): void {
   if (mainWindow) {
+    if (quitTimeout) {
+      clearTimeout(quitTimeout)
+    }
     mainWindow.show()
     mainWindow.focusOnWebView()
+  }
+}
+
+export function closeMainWindow(): void {
+  if (mainWindow) {
+    mainWindow.close()
   }
 }

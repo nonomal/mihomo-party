@@ -5,10 +5,12 @@ import {
   ModalBody,
   ModalFooter,
   Button,
-  Input
+  Input,
+  Switch
 } from '@nextui-org/react'
 import React, { useState } from 'react'
 import SettingItem from '../base/base-setting-item'
+import { restartCore } from '@renderer/utils/ipc'
 interface Props {
   item: IOverrideItem
   updateOverrideItem: (item: IOverrideItem) => Promise<void>
@@ -20,6 +22,7 @@ const EditInfoModal: React.FC<Props> = (props) => {
 
   const onSave = async (): Promise<void> => {
     await updateOverrideItem(values)
+    await restartCore()
     onClose()
   }
 
@@ -33,7 +36,7 @@ const EditInfoModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">编辑信息</ModalHeader>
+        <ModalHeader className="flex app-drag">编辑信息</ModalHeader>
         <ModalBody>
           <SettingItem title="名称">
             <Input
@@ -57,12 +60,21 @@ const EditInfoModal: React.FC<Props> = (props) => {
               />
             </SettingItem>
           )}
+          <SettingItem title="全局启用">
+            <Switch
+              size="sm"
+              isSelected={values.global}
+              onValueChange={(v) => {
+                setValues({ ...values, global: v })
+              }}
+            />
+          </SettingItem>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
+          <Button size="sm" variant="light" onPress={onClose}>
             取消
           </Button>
-          <Button color="primary" onPress={onSave}>
+          <Button size="sm" color="primary" onPress={onSave}>
             保存
           </Button>
         </ModalFooter>

@@ -13,7 +13,7 @@ const ErrorFallback = ({ error }: FallbackProps): JSX.Element => {
         size="sm"
         color="primary"
         variant="flat"
-        onPress={() => open('https://github.com/pompurin404/mihomo-party/issues/new/choose')}
+        onPress={() => open('https://github.com/mihomo-party-org/mihomo-party/issues/new/choose')}
       >
         GitHub
       </Button>
@@ -22,7 +22,7 @@ const ErrorFallback = ({ error }: FallbackProps): JSX.Element => {
         color="primary"
         variant="flat"
         className="ml-2"
-        onPress={() => open('https://t.me/mihomo_party')}
+        onPress={() => open('https://t.me/mihomo_party_group')}
       >
         Telegram
       </Button>
