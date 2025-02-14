@@ -1,14 +1,23 @@
-import { Button, Card, CardBody, CardFooter } from '@nextui-org/react'
+import { Button, Card, CardBody, CardFooter, Tooltip } from '@heroui/react'
 import React from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IoLayersOutline } from 'react-icons/io5'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
-const ResourceCard: React.FC = () => {
+import { useTranslation } from 'react-i18next'
+
+interface Props {
+  iconOnly?: boolean
+}
+
+const ResourceCard: React.FC<Props> = (props) => {
+  const { t } = useTranslation()
   const { appConfig } = useAppConfig()
+  const { iconOnly } = props
   const { resourceCardStatus = 'col-span-1' } = appConfig || {}
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/resources')
   const {
     attributes,
@@ -21,6 +30,26 @@ const ResourceCard: React.FC = () => {
     id: 'resource'
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
+
+  if (iconOnly) {
+    return (
+      <div className={`${resourceCardStatus} flex justify-center`}>
+        <Tooltip content={t('sider.cards.resources')} placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/resources')
+            }}
+          >
+            <IoLayersOutline className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -29,7 +58,7 @@ const ResourceCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={resourceCardStatus}
+      className={`${resourceCardStatus} resource-card`}
     >
       <Card
         fullWidth
@@ -48,14 +77,16 @@ const ResourceCard: React.FC = () => {
             >
               <IoLayersOutline
                 color="default"
-                className={`${match ? 'text-white' : 'text-foreground'} text-[24px] font-bold`}
+                className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px] font-bold`}
               />
             </Button>
           </div>
         </CardBody>
         <CardFooter className="pt-1">
-          <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>
-            外部资源
+          <h3
+            className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+          >
+            {t('sider.cards.resources')}
           </h3>
         </CardFooter>
       </Card>

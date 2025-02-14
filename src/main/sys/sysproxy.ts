@@ -1,12 +1,16 @@
 import { triggerAutoProxy, triggerManualProxy } from '@mihomo-party/sysproxy'
 import { getAppConfig, getControledMihomoConfig } from '../config'
-import { pacPort } from '../resolve/server'
+import { pacPort, startPacServer, stopPacServer } from '../resolve/server'
 import { promisify } from 'util'
 import { execFile } from 'child_process'
 import path from 'path'
 import { resourcesFilesDir } from '../utils/dirs'
+import { net } from 'electron'
+import axios from 'axios'
 
 let defaultBypass: string[]
+let triggerSysProxyTimer: NodeJS.Timeout | null = null
+const helperSocketPath = '/tmp/mihomo-party-helper.sock'
 
 if (process.platform === 'linux')
   defaultBypass = ['localhost', '127.0.0.1', '192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '::1']
@@ -47,15 +51,21 @@ if (process.platform === 'win32')
   ]
 
 export async function triggerSysProxy(enable: boolean): Promise<void> {
-  if (enable) {
-    disableSysProxy()
-    await enableSysProxy()
+  if (net.isOnline()) {
+    if (enable) {
+      await disableSysProxy()
+      await enableSysProxy()
+    } else {
+      await disableSysProxy()
+    }
   } else {
-    disableSysProxy()
+    if (triggerSysProxyTimer) clearTimeout(triggerSysProxyTimer)
+    triggerSysProxyTimer = setTimeout(() => triggerSysProxy(enable), 5000)
   }
 }
 
-export async function enableSysProxy(): Promise<void> {
+async function enableSysProxy(): Promise<void> {
+  await startPacServer()
   const { sysProxy } = await getAppConfig()
   const { mode, host, bypass = defaultBypass } = sysProxy
   const { 'mixed-port': port = 7890 } = await getControledMihomoConfig()
@@ -71,6 +81,14 @@ export async function enableSysProxy(): Promise<void> {
         } catch {
           triggerAutoProxy(true, `http://${host || '127.0.0.1'}:${pacPort}/pac`)
         }
+      } else if (process.platform === 'darwin') {
+        await axios.post(
+          'http://localhost/pac',
+          { url: `http://${host || '127.0.0.1'}:${pacPort}/pac` },
+          {
+            socketPath: helperSocketPath
+          }
+        )
       } else {
         triggerAutoProxy(true, `http://${host || '127.0.0.1'}:${pacPort}/pac`)
       }
@@ -89,6 +107,14 @@ export async function enableSysProxy(): Promise<void> {
         } catch {
           triggerManualProxy(true, host || '127.0.0.1', port, bypass.join(','))
         }
+      } else if (process.platform === 'darwin') {
+        await axios.post(
+          'http://localhost/global',
+          { host: host || '127.0.0.1', port: port.toString(), bypass: bypass.join(',') },
+          {
+            socketPath: helperSocketPath
+          }
+        )
       } else {
         triggerManualProxy(true, host || '127.0.0.1', port, bypass.join(','))
       }
@@ -97,10 +123,20 @@ export async function enableSysProxy(): Promise<void> {
   }
 }
 
-export function disableSysProxy(): void {
+async function disableSysProxy(): Promise<void> {
+  await stopPacServer()
   const execFilePromise = promisify(execFile)
   if (process.platform === 'win32') {
-    execFilePromise(path.join(resourcesFilesDir(), 'sysproxy.exe'), ['set', '1'])
+    try {
+      await execFilePromise(path.join(resourcesFilesDir(), 'sysproxy.exe'), ['set', '1'])
+    } catch {
+      triggerAutoProxy(false, '')
+      triggerManualProxy(false, '', 0, '')
+    }
+  } else if (process.platform === 'darwin') {
+    await axios.get('http://localhost/off', {
+      socketPath: helperSocketPath
+    })
   } else {
     triggerAutoProxy(false, '')
     triggerManualProxy(false, '', 0, '')

@@ -1,12 +1,43 @@
 import BasePage from '@renderer/components/base/base-page'
 import LogItem from '@renderer/components/logs/log-item'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Divider, Input } from '@nextui-org/react'
+import { Button, Divider, Input } from '@heroui/react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { IoLocationSharp } from 'react-icons/io5'
+import { CgTrash } from 'react-icons/cg'
+import { useTranslation } from 'react-i18next'
+
+import { includesIgnoreCase } from '@renderer/utils/includes'
+
+const cachedLogs: {
+  log: IMihomoLogInfo[]
+  trigger: ((i: IMihomoLogInfo[]) => void) | null
+  clean: () => void
+} = {
+  log: [],
+  trigger: null,
+  clean(): void {
+    this.log = []
+    if (this.trigger !== null) {
+      this.trigger(this.log)
+    }
+  }
+}
+
+window.electron.ipcRenderer.on('mihomoLogs', (_e, log: IMihomoLogInfo) => {
+  log.time = new Date().toLocaleString()
+  cachedLogs.log.push(log)
+  if (cachedLogs.log.length >= 500) {
+    cachedLogs.log.shift()
+  }
+  if (cachedLogs.trigger !== null) {
+    cachedLogs.trigger(cachedLogs.log)
+  }
+})
 
 const Logs: React.FC = () => {
-  const [logs, setLogs] = useState<IMihomoLogInfo[]>([])
+  const { t } = useTranslation()
+  const [logs, setLogs] = useState<IMihomoLogInfo[]>(cachedLogs.log)
   const [filter, setFilter] = useState('')
   const [trace, setTrace] = useState(true)
 
@@ -14,7 +45,7 @@ const Logs: React.FC = () => {
   const filteredLogs = useMemo(() => {
     if (filter === '') return logs
     return logs.filter((log) => {
-      return log.payload.includes(filter) || log.type.includes(filter)
+      return includesIgnoreCase(log.payload, filter) || includesIgnoreCase(log.type, filter)
     })
   }, [logs, filter])
 
@@ -29,26 +60,23 @@ const Logs: React.FC = () => {
   }, [filteredLogs, trace])
 
   useEffect(() => {
-    window.electron.ipcRenderer.on('mihomoLogs', (_e, log: IMihomoLogInfo) => {
-      log.time = new Date().toLocaleString()
-      setLogs((prevLogs) => {
-        return [...prevLogs, log]
-      })
-    })
-
+    const old = cachedLogs.trigger
+    cachedLogs.trigger = (a): void => {
+      setLogs([...a])
+    }
     return (): void => {
-      window.electron.ipcRenderer.removeAllListeners('mihomoLogs')
+      cachedLogs.trigger = old
     }
   }, [])
 
   return (
-    <BasePage title="实时日志">
+    <BasePage title={t('logs.title')}>
       <div className="sticky top-0 z-40">
         <div className="w-full flex p-2">
           <Input
             size="sm"
             value={filter}
-            placeholder="筛选过滤"
+            placeholder={t('logs.filter')}
             isClearable
             onValueChange={setFilter}
           />
@@ -58,11 +86,25 @@ const Logs: React.FC = () => {
             className="ml-2"
             color={trace ? 'primary' : 'default'}
             variant={trace ? 'solid' : 'bordered'}
+            title={t('logs.autoScroll')}
             onPress={() => {
               setTrace((prev) => !prev)
             }}
           >
             <IoLocationSharp className="text-lg" />
+          </Button>
+          <Button
+            size="sm"
+            isIconOnly
+            title={t('logs.clear')}
+            className="ml-2"
+            variant="light"
+            color="danger"
+            onPress={() => {
+              cachedLogs.clean()
+            }}
+          >
+            <CgTrash className="text-lg" />
           </Button>
         </div>
         <Divider />

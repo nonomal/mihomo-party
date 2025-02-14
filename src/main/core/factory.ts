@@ -4,34 +4,76 @@ import {
   getProfile,
   getProfileItem,
   getOverride,
-  getOverrideItem
+  getOverrideItem,
+  getOverrideConfig,
+  getAppConfig
 } from '../config'
-import { mihomoWorkConfigPath, overridePath } from '../utils/dirs'
+import {
+  mihomoProfileWorkDir,
+  mihomoWorkConfigPath,
+  mihomoWorkDir,
+  overridePath
+} from '../utils/dirs'
 import yaml from 'yaml'
-import { writeFile } from 'fs/promises'
+import { copyFile, mkdir, writeFile } from 'fs/promises'
 import { deepMerge } from '../utils/merge'
 import vm from 'vm'
-import { writeFileSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
+import path from 'path'
 
 let runtimeConfigStr: string
 let runtimeConfig: IMihomoConfig
 
 export async function generateProfile(): Promise<void> {
   const { current } = await getProfileConfig()
+  const { diffWorkDir = false } = await getAppConfig()
   const currentProfile = await overrideProfile(current, await getProfile(current))
   const controledMihomoConfig = await getControledMihomoConfig()
   const profile = deepMerge(currentProfile, controledMihomoConfig)
+  // 确保可以拿到基础日志信息
+  // 使用 debug 可以调试内核相关问题 `debug/pprof`
+  if (['info', 'debug'].includes(profile['log-level']) === false) {
+    profile['log-level'] = 'info'
+  }
   runtimeConfig = profile
   runtimeConfigStr = yaml.stringify(profile)
-  await writeFile(mihomoWorkConfigPath(), runtimeConfigStr)
+  if (diffWorkDir) {
+    await prepareProfileWorkDir(current)
+  }
+  await writeFile(
+    diffWorkDir ? mihomoWorkConfigPath(current) : mihomoWorkConfigPath('work'),
+    runtimeConfigStr
+  )
+}
+
+async function prepareProfileWorkDir(current: string | undefined): Promise<void> {
+  if (!existsSync(mihomoProfileWorkDir(current))) {
+    await mkdir(mihomoProfileWorkDir(current), { recursive: true })
+  }
+  const copy = async (file: string): Promise<void> => {
+    const targetPath = path.join(mihomoProfileWorkDir(current), file)
+    const sourcePath = path.join(mihomoWorkDir(), file)
+    if (!existsSync(targetPath) && existsSync(sourcePath)) {
+      await copyFile(sourcePath, targetPath)
+    }
+  }
+  await Promise.all([
+    copy('country.mmdb'),
+    copy('geoip.metadb'),
+    copy('geoip.dat'),
+    copy('geosite.dat'),
+    copy('ASN.mmdb')
+  ])
 }
 
 async function overrideProfile(
   current: string | undefined,
   profile: IMihomoConfig
 ): Promise<IMihomoConfig> {
+  const { items = [] } = (await getOverrideConfig()) || {}
+  const globalOverride = items.filter((item) => item.global).map((item) => item.id)
   const { override = [] } = (await getProfileItem(current)) || {}
-  for (const ov of override) {
+  for (const ov of new Set(globalOverride.concat(override))) {
     const item = await getOverrideItem(ov)
     const content = await getOverride(ov, item?.ext || 'js')
     switch (item?.ext) {
@@ -39,7 +81,8 @@ async function overrideProfile(
         profile = runOverrideScript(profile, content, item)
         break
       case 'yaml': {
-        const patch = yaml.parse(content) || {}
+        let patch = yaml.parse(content, { merge: true }) || {}
+        if (typeof patch !== 'object') patch = {}
         profile = deepMerge(profile, patch)
         break
       }
@@ -86,7 +129,7 @@ function runOverrideScript(
     log('info', '脚本执行成功')
     return newProfile
   } catch (e) {
-    log('exception', `脚本执行失败: ${e}`)
+    log('exception', `脚本执行失败：${e}`)
     return profile
   }
 }

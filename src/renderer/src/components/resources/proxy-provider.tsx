@@ -1,22 +1,74 @@
-import { mihomoProxyProviders, mihomoUpdateProxyProviders } from '@renderer/utils/ipc'
-import { Fragment, useMemo, useState } from 'react'
+import {
+  mihomoProxyProviders,
+  mihomoUpdateProxyProviders,
+  getRuntimeConfig
+} from '@renderer/utils/ipc'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import Viewer from './viewer'
 import useSWR from 'swr'
 import SettingCard from '../base/base-setting-card'
 import SettingItem from '../base/base-setting-item'
-import { Button, Chip } from '@nextui-org/react'
+import { Button, Chip } from '@heroui/react'
 import { IoMdRefresh } from 'react-icons/io'
-import dayjs from 'dayjs'
+import { CgLoadbarDoc } from 'react-icons/cg'
+import { MdEditDocument } from 'react-icons/md'
+import dayjs from '@renderer/utils/dayjs'
 import { calcTraffic } from '@renderer/utils/calc'
-
+import { getHash } from '@renderer/utils/hash'
+import { useTranslation } from 'react-i18next'
 const ProxyProvider: React.FC = () => {
+  const { t } = useTranslation()
+  const [showDetails, setShowDetails] = useState({
+    show: false,
+    path: '',
+    type: '',
+    title: '',
+    privderType: ''
+  })
+  useEffect(() => {
+    if (showDetails.title) {
+      const fetchProviderPath = async (name: string): Promise<void> => {
+        try {
+          const providers= await getRuntimeConfig()
+          const provider = providers['proxy-providers'][name]
+          if (provider) {
+            setShowDetails((prev) => ({
+              ...prev,
+              show: true,
+              path: provider?.path || `proxies/${getHash(provider?.url)}`
+            }))
+          }
+        } catch {
+          setShowDetails((prev) => ({ ...prev, path: '' }))
+        }
+      }
+      fetchProviderPath(showDetails.title)
+    }
+  }, [showDetails.title])
+
   const { data, mutate } = useSWR('mihomoProxyProviders', mihomoProxyProviders)
   const providers = useMemo(() => {
     if (!data) return []
-    if (!data.providers) return []
-    return Object.keys(data.providers)
-      .map((key) => data.providers[key])
-      .filter((provider) => {
-        return 'subscriptionInfo' in provider
+    return Object.values(data.providers)
+      .map(provider => {
+        if (provider.vehicleType === 'Inline' || provider.vehicleType === 'File') {
+          return {
+            ...provider,
+            subscriptionInfo: null
+          }
+        }
+        return provider
+      })
+
+      .filter(provider => 'subscriptionInfo' in provider)
+      .sort((a, b) => {
+        if (a.vehicleType === 'File' && b.vehicleType !== 'File') {
+          return -1
+        }
+        if (a.vehicleType !== 'File' && b.vehicleType === 'File') {
+          return 1
+        }
+        return 0
       })
   }, [data])
   const [updating, setUpdating] = useState(Array(providers.length).fill(false))
@@ -45,7 +97,16 @@ const ProxyProvider: React.FC = () => {
 
   return (
     <SettingCard>
-      <SettingItem title="代理集合" divider>
+      {showDetails.show && (
+        <Viewer
+          path={showDetails.path}
+          type={showDetails.type}
+          title={showDetails.title}
+          privderType={showDetails.privderType}
+          onClose={() => setShowDetails({ show: false, path: '', type: '', title: '', privderType: '' })}
+        />
+      )}
+      <SettingItem title={t('resources.proxyProviders.title')} divider>
         <Button
           size="sm"
           color="primary"
@@ -55,59 +116,79 @@ const ProxyProvider: React.FC = () => {
             })
           }}
         >
-          更新全部
+          {t('resources.proxyProviders.updateAll')}
         </Button>
       </SettingItem>
-      {providers.map((provider, index) => {
-        return (
-          <Fragment key={provider.name}>
+      {providers.map((provider, index) => (
+        <Fragment key={provider.name}>
+          <SettingItem
+            title={provider.name}
+            actions={
+              <Chip className="ml-2" size="sm">
+                {provider.proxies?.length || 0}
+              </Chip>
+            }
+            divider={!provider.subscriptionInfo && index !== providers.length - 1}
+          >
+            <div className="flex h-[32px] leading-[32px] text-foreground-500">
+              <div>{dayjs(provider.updatedAt).fromNow()}</div>
+              {/* <Button isIconOnly className="ml-2" size="sm">
+                <IoMdEye className="text-lg" />
+              </Button> */}
+              <Button
+                isIconOnly
+                title={provider.vehicleType == 'File' ? t('common.editor.edit') : t('common.viewer.view')}
+                className="ml-2"
+                size="sm"
+                onPress={() => {
+                  setShowDetails({
+                    show: false,
+                    privderType: 'proxy-providers',
+                    path: provider.name,
+                    type: provider.vehicleType,
+                    title: provider.name
+                  })
+                }}
+              >
+                {provider.vehicleType == 'File' ? (
+                  <MdEditDocument className={`text-lg`} />
+                ) : (
+                  <CgLoadbarDoc className={`text-lg`} />
+                )}
+              </Button>
+              <Button
+                isIconOnly
+                title={t('common.updater.update')}
+                className="ml-2"
+                size="sm"
+                onPress={() => {
+                  onUpdate(provider.name, index)
+                }}
+              >
+                <IoMdRefresh className={`text-lg ${updating[index] ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </SettingItem>
+          {provider.subscriptionInfo && (
             <SettingItem
-              title={provider.name}
-              actions={
-                <Chip className="ml-2" size="sm">
-                  {provider.proxies?.length || 0}
-                </Chip>
-              }
-              divider={!provider.subscriptionInfo && index !== providers.length - 1}
-            >
-              {
-                <div className="flex h-[32px] leading-[32px] text-default-500">
-                  <div>{dayjs(provider.updatedAt).fromNow()}</div>
-                  <Button
-                    isIconOnly
-                    className="ml-2"
-                    size="sm"
-                    onPress={() => {
-                      onUpdate(provider.name, index)
-                    }}
-                  >
-                    <IoMdRefresh className={`text-lg ${updating[index] ? 'animate-spin' : ''}`} />
-                  </Button>
+              divider={index !== providers.length - 1}
+              title={
+                <div className="text-foreground-500">
+                  {`${calcTraffic(
+                    provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download
+                  )} / ${calcTraffic(provider.subscriptionInfo.Total)}`}
                 </div>
               }
+            >
+              <div className="h-[32px] leading-[32px] text-foreground-500">
+                {provider.subscriptionInfo.Expire
+                  ? dayjs.unix(provider.subscriptionInfo.Expire).format('YYYY-MM-DD')
+                  : t('profiles.neverExpire')}
+              </div>
             </SettingItem>
-            {provider.subscriptionInfo && (
-              <SettingItem
-                divider={index !== providers.length - 1}
-                title={
-                  <div className="text-default-500">{`${calcTraffic(
-                    provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download
-                  )}
-                    /${calcTraffic(provider.subscriptionInfo.Total)}`}</div>
-                }
-              >
-                {provider.subscriptionInfo && (
-                  <div className="h-[32px] leading-[32px] text-default-500">
-                    {provider.subscriptionInfo.Expire
-                      ? dayjs.unix(provider.subscriptionInfo.Expire).format('YYYY-MM-DD')
-                      : '长期有效'}
-                  </div>
-                )}
-              </SettingItem>
-            )}
-          </Fragment>
-        )
-      })}
+          )}
+        </Fragment>
+      ))}
     </SettingCard>
   )
 }

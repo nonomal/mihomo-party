@@ -1,10 +1,11 @@
-import { Button, Input } from '@nextui-org/react'
+import { Button, Input } from '@heroui/react'
 import SettingCard from '../base/base-setting-card'
 import SettingItem from '../base/base-setting-item'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import React, { KeyboardEvent, useState } from 'react'
 import { platform } from '@renderer/utils/init'
 import { registerShortcut } from '@renderer/utils/ipc'
+import { useTranslation } from 'react-i18next'
 
 const keyMap = {
   Backquote: '`',
@@ -40,9 +41,11 @@ const keyMap = {
 }
 
 const ShortcutConfig: React.FC = () => {
+  const { t } = useTranslation()
   const { appConfig, patchAppConfig } = useAppConfig()
   const {
     showWindowShortcut = '',
+    showFloatingWindowShortcut = '',
     triggerSysProxyShortcut = '',
     triggerTunShortcut = '',
     ruleModeShortcut = '',
@@ -53,8 +56,8 @@ const ShortcutConfig: React.FC = () => {
   } = appConfig || {}
 
   return (
-    <SettingCard title="快捷键设置">
-      <SettingItem title="打开/关闭窗口" divider>
+    <SettingCard title={t('shortcuts.title')}>
+      <SettingItem title={t('shortcuts.toggleWindow')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={showWindowShortcut}
@@ -63,7 +66,16 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="打开/关闭系统代理" divider>
+      <SettingItem title={t('shortcuts.toggleFloatingWindow')} divider>
+        <div className="flex justify-end w-[60%]">
+          <ShortcutInput
+            value={showFloatingWindowShortcut}
+            patchAppConfig={patchAppConfig}
+            action="showFloatingWindowShortcut"
+          />
+        </div>
+      </SettingItem>
+      <SettingItem title={t('shortcuts.toggleSystemProxy')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={triggerSysProxyShortcut}
@@ -72,7 +84,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="打开/关闭虚拟网卡" divider>
+      <SettingItem title={t('shortcuts.toggleTun')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={triggerTunShortcut}
@@ -81,7 +93,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="切换规则模式" divider>
+      <SettingItem title={t('shortcuts.toggleRuleMode')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={ruleModeShortcut}
@@ -90,7 +102,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="切换全局模式" divider>
+      <SettingItem title={t('shortcuts.toggleGlobalMode')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={globalModeShortcut}
@@ -99,7 +111,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="切换直连模式" divider>
+      <SettingItem title={t('shortcuts.toggleDirectMode')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={directModeShortcut}
@@ -108,7 +120,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="轻量模式">
+      <SettingItem title={t('shortcuts.toggleLightMode')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={quitWithoutCoreShortcut}
@@ -117,7 +129,7 @@ const ShortcutConfig: React.FC = () => {
           />
         </div>
       </SettingItem>
-      <SettingItem title="重启应用">
+      <SettingItem title={t('shortcuts.restartApp')}>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
             value={restartAppShortcut}
@@ -135,6 +147,7 @@ const ShortcutInput: React.FC<{
   action: string
   patchAppConfig: (value: Partial<IAppConfig>) => Promise<void>
 }> = (props) => {
+  const { t } = useTranslation()
   const { value, action, patchAppConfig } = props
   const [inputValue, setInputValue] = useState(value)
 
@@ -200,18 +213,18 @@ const ShortcutInput: React.FC<{
                 await patchAppConfig({ [action]: inputValue })
                 window.electron.ipcRenderer.send('updateTrayMenu')
               } else {
-                alert('快捷键注册失败')
+                alert(t('common.error.shortcutRegistrationFailed'))
               }
             } catch (e) {
-              alert(`快捷键注册失败: ${e}`)
+              alert(t('common.error.shortcutRegistrationFailedWithError', { error: e }))
             }
           }}
         >
-          确认
+          {t('common.confirm')}
         </Button>
       )}
       <Input
-        placeholder="点击输入快捷键"
+        placeholder={t('shortcuts.input.placeholder')}
         onKeyDown={(e: KeyboardEvent): void => {
           parseShortcut(e, setInputValue)
         }}

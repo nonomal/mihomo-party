@@ -11,7 +11,8 @@ import {
   profilePath,
   profilesDir,
   resourcesFilesDir,
-  subStoreDir
+  subStoreDir,
+  themesDir
 } from './dirs'
 import {
   defaultConfig,
@@ -24,14 +25,27 @@ import yaml from 'yaml'
 import { mkdir, writeFile, copyFile, rm, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import { startPacServer, startSubStoreServer } from '../resolve/server'
+import {
+  startPacServer,
+  startSubStoreBackendServer,
+  startSubStoreFrontendServer
+} from '../resolve/server'
 import { triggerSysProxy } from '../sys/sysproxy'
-import { getAppConfig, patchAppConfig } from '../config'
+import {
+  getAppConfig,
+  getControledMihomoConfig,
+  patchAppConfig,
+  patchControledMihomoConfig
+} from '../config'
 import { app } from 'electron'
+import { startSSIDCheck } from '../sys/ssid'
 
 async function initDirs(): Promise<void> {
   if (!existsSync(dataDir())) {
     await mkdir(dataDir())
+  }
+  if (!existsSync(themesDir())) {
+    await mkdir(themesDir())
   }
   if (!existsSync(profilesDir())) {
     await mkdir(profilesDir())
@@ -85,6 +99,7 @@ async function initFiles(): Promise<void> {
   }
   await Promise.all([
     copy('country.mmdb'),
+    copy('geoip.metadb'),
     copy('geoip.dat'),
     copy('geosite.dat'),
     copy('ASN.mmdb')
@@ -95,7 +110,7 @@ async function cleanup(): Promise<void> {
   // update cache
   const files = await readdir(dataDir())
   for (const file of files) {
-    if (file.endsWith('.exe') || file.endsWith('.dmg')) {
+    if (file.endsWith('.exe') || file.endsWith('.pkg') || file.endsWith('.7z')) {
       try {
         await rm(path.join(dataDir(), file))
       } catch {
@@ -136,11 +151,74 @@ async function migration(): Promise<void> {
       'log',
       'substore'
     ],
-    useSubStore = true
+    appTheme = 'system',
+    envType = [process.platform === 'win32' ? 'powershell' : 'bash'],
+    useSubStore = true,
+    showFloatingWindow = false,
+    disableTray = false,
+    encryptedPassword
   } = await getAppConfig()
+  const {
+    'external-controller-pipe': externalControllerPipe,
+    'external-controller-unix': externalControllerUnix,
+    'external-controller': externalController,
+    'skip-auth-prefixes': skipAuthPrefixes,
+    authentication,
+    'bind-address': bindAddress,
+    'lan-allowed-ips': lanAllowedIps,
+    'lan-disallowed-ips': lanDisallowedIps
+  } = await getControledMihomoConfig()
   // add substore sider card
   if (useSubStore && !siderOrder.includes('substore')) {
     await patchAppConfig({ siderOrder: [...siderOrder, 'substore'] })
+  }
+  // add default skip auth prefix
+  if (!skipAuthPrefixes) {
+    await patchControledMihomoConfig({ 'skip-auth-prefixes': ['127.0.0.1/32'] })
+  }
+  // add default authentication
+  if (!authentication) {
+    await patchControledMihomoConfig({ authentication: [] })
+  }
+  // add default bind address
+  if (!bindAddress) {
+    await patchControledMihomoConfig({ 'bind-address': '*' })
+  }
+  // add default lan allowed ips
+  if (!lanAllowedIps) {
+    await patchControledMihomoConfig({ 'lan-allowed-ips': ['0.0.0.0/0', '::/0'] })
+  }
+  // add default lan disallowed ips
+  if (!lanDisallowedIps) {
+    await patchControledMihomoConfig({ 'lan-disallowed-ips': [] })
+  }
+  // remove custom app theme
+  if (!['system', 'light', 'dark'].includes(appTheme)) {
+    await patchAppConfig({ appTheme: 'system' })
+  }
+  // change env type
+  if (typeof envType === 'string') {
+    await patchAppConfig({ envType: [envType] })
+  }
+  // use unix socket
+  if (externalControllerUnix) {
+    await patchControledMihomoConfig({ 'external-controller-unix': undefined })
+  }
+  // use named pipe
+  if (externalControllerPipe) {
+    await patchControledMihomoConfig({
+      'external-controller-pipe': undefined
+    })
+  }
+  if (externalController === undefined) {
+    await patchControledMihomoConfig({ 'external-controller': '' })
+  }
+  if (!showFloatingWindow && disableTray) {
+    await patchAppConfig({ disableTray: false })
+  }
+  // remove password
+  if (encryptedPassword) {
+    await patchAppConfig({ encryptedPassword: undefined })
   }
 }
 
@@ -162,10 +240,18 @@ export async function init(): Promise<void> {
   await migration()
   await initFiles()
   await cleanup()
-  await startPacServer()
-  await startSubStoreServer()
+  await startSubStoreFrontendServer()
+  await startSubStoreBackendServer()
   const { sysProxy } = await getAppConfig()
-  await triggerSysProxy(sysProxy.enable)
+  try {
+    if (sysProxy.enable) {
+      await startPacServer()
+    }
+    await triggerSysProxy(sysProxy.enable)
+  } catch {
+    // ignore
+  }
+  await startSSIDCheck()
 
   initDeeplink()
 }

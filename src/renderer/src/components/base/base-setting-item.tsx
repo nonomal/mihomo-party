@@ -1,4 +1,4 @@
-import { Divider } from '@nextui-org/react'
+import { Divider } from '@heroui/react'
 
 import React from 'react'
 
@@ -14,10 +14,10 @@ const SettingItem: React.FC<Props> = (props) => {
 
   return (
     <>
-      <div className="h-[32px] w-full flex justify-between">
+      <div className="select-text h-[32px] w-full flex justify-between">
         <div className="h-full flex items-center">
-          <h4 className="h-full text-md leading-[32px] whitespace-nowrap mr-2">{title}</h4>
-          <div className="mr-2">{actions}</div>
+          <h4 className="h-full text-md leading-[32px] whitespace-nowrap">{title}</h4>
+          <div>{actions}</div>
         </div>
         {children}
       </div>

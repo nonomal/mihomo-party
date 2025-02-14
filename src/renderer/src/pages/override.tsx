@@ -6,7 +6,7 @@ import {
   DropdownMenu,
   DropdownTrigger,
   Input
-} from '@nextui-org/react'
+} from '@heroui/react'
 import BasePage from '@renderer/components/base/base-page'
 import { getFilePath, readTextFile } from '@renderer/utils/ipc'
 import { useEffect, useRef, useState } from 'react'
@@ -25,8 +25,10 @@ import OverrideItem from '@renderer/components/override/override-item'
 import { FaPlus } from 'react-icons/fa6'
 import { HiOutlineDocumentText } from 'react-icons/hi'
 import { RiArchiveLine } from 'react-icons/ri'
+import { useTranslation } from 'react-i18next'
 
 const Override: React.FC = () => {
+  const { t } = useTranslation()
   const {
     overrideConfig,
     setOverrideConfig,
@@ -102,7 +104,7 @@ const Override: React.FC = () => {
             setFileOver(false)
           }
         } else {
-          alert('不支持的文件类型')
+          alert(t('override.unsupportedFileType'))
         }
       }
       setFileOver(false)
@@ -121,29 +123,29 @@ const Override: React.FC = () => {
   return (
     <BasePage
       ref={pageRef}
-      title="覆写"
+      title={t('override.title')}
       header={
         <>
           <Button
             size="sm"
             variant="light"
-            title="使用文档"
+            title={t('override.docs')}
             isIconOnly
             className="app-nodrag"
             onPress={() => {
-              open('https://mihomo.party/guides/function/override/yaml/')
+              open('https://mihomo.party/docs/guide/override')
             }}
           >
             <HiOutlineDocumentText className="text-lg" />
           </Button>
           <Button
             className="app-nodrag"
-            title="常用覆写仓库"
+            title={t('override.repository')}
             isIconOnly
             variant="light"
             size="sm"
             onPress={() => {
-              open('https://github.com/pompurin404/override-hub')
+              open('https://github.com/mihomo-party-org/override-hub')
             }}
           >
             <RiArchiveLine className="text-lg" />
@@ -180,7 +182,7 @@ const Override: React.FC = () => {
             isLoading={importing}
             onPress={handleImport}
           >
-            导入
+            {t('override.import')}
           </Button>
           <Dropdown>
             <DropdownTrigger>
@@ -208,24 +210,24 @@ const Override: React.FC = () => {
                   }
                 } else if (key === 'new-yaml') {
                   await addOverrideItem({
-                    name: '新建YAML',
+                    name: t('override.newFile.yaml'),
                     type: 'local',
-                    file: '# https://mihomo.party/guides/function/override/yaml/',
+                    file: t('override.defaultContent.yaml'),
                     ext: 'yaml'
                   })
                 } else if (key === 'new-js') {
                   await addOverrideItem({
-                    name: '新建JS',
+                    name: t('override.newFile.js'),
                     type: 'local',
-                    file: '// https://mihomo.party/guides/function/override/js/\nfunction main(config) {\n  return config\n}',
+                    file: t('override.defaultContent.js'),
                     ext: 'js'
                   })
                 }
               }}
             >
-              <DropdownItem key="open">打开</DropdownItem>
-              <DropdownItem key="new-yaml">新建 YAML</DropdownItem>
-              <DropdownItem key="new-js">新建 JavaScript</DropdownItem>
+              <DropdownItem key="open">{t('override.actions.open')}</DropdownItem>
+              <DropdownItem key="new-yaml">{t('override.actions.newYaml')}</DropdownItem>
+              <DropdownItem key="new-js">{t('override.actions.newJs')}</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>

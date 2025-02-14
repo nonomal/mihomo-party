@@ -1,4 +1,4 @@
-import { Card, CardBody } from '@nextui-org/react'
+import { Card, CardBody } from '@heroui/react'
 import React from 'react'
 
 const RuleItem: React.FC<IMihomoRulesDetail & { index: number }> = (props) => {
@@ -10,7 +10,7 @@ const RuleItem: React.FC<IMihomoRulesDetail & { index: number }> = (props) => {
           <div title={payload} className="text-ellipsis whitespace-nowrap overflow-hidden">
             {payload}
           </div>
-          <div className="flex justify-start text-default-500">
+          <div className="flex justify-start text-foreground-500">
             <div>{type}</div>
             <div className="ml-2">{proxy}</div>
           </div>

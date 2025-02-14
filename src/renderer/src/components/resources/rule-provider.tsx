@@ -1,18 +1,64 @@
-import { mihomoRuleProviders, mihomoUpdateRuleProviders } from '@renderer/utils/ipc'
-import { Fragment, useMemo, useState } from 'react'
+import {
+  mihomoRuleProviders,
+  mihomoUpdateRuleProviders,
+  getRuntimeConfig
+} from '@renderer/utils/ipc'
+import { getHash } from '@renderer/utils/hash'
+import Viewer from './viewer'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import SettingCard from '../base/base-setting-card'
 import SettingItem from '../base/base-setting-item'
-import { Button, Chip } from '@nextui-org/react'
+import { Button, Chip } from '@heroui/react'
 import { IoMdRefresh } from 'react-icons/io'
-import dayjs from 'dayjs'
+import { CgLoadbarDoc } from 'react-icons/cg'
+import { MdEditDocument } from 'react-icons/md'
+import dayjs from '@renderer/utils/dayjs'
+import { useTranslation } from 'react-i18next'
 
 const RuleProvider: React.FC = () => {
+  const { t } = useTranslation()
+  const [showDetails, setShowDetails] = useState({
+    show: false,
+    path: '',
+    type: '',
+    title: '',
+    format: '',
+    privderType: ''
+  })
+  useEffect(() => {
+    if (showDetails.title) {
+      const fetchProviderPath = async (name: string): Promise<void> => {
+        try {
+          const providers= await getRuntimeConfig()
+          const provider = providers['rule-providers'][name]
+          if (provider) {
+            setShowDetails((prev) => ({
+              ...prev,
+              show: true,
+              path: provider?.path || `rules/${getHash(provider?.url)}`
+            }))
+          }
+        } catch {
+          setShowDetails((prev) => ({ ...prev, path: '' }))
+        }
+      }
+      fetchProviderPath(showDetails.title)
+    }
+  }, [showDetails.title])
+
   const { data, mutate } = useSWR('mihomoRuleProviders', mihomoRuleProviders)
   const providers = useMemo(() => {
     if (!data) return []
-    if (!data.providers) return []
-    return Object.keys(data.providers).map((key) => data.providers[key])
+    return Object.values(data.providers).sort((a, b) => {
+      if (a.vehicleType === 'File' && b.vehicleType !== 'File') {
+        return -1
+      }
+      if (a.vehicleType !== 'File' && b.vehicleType === 'File') {
+        return 1
+      }
+      return 0
+    })
   }, [data])
   const [updating, setUpdating] = useState(Array(providers.length).fill(false))
 
@@ -40,7 +86,17 @@ const RuleProvider: React.FC = () => {
 
   return (
     <SettingCard>
-      <SettingItem title="规则集合" divider>
+      {showDetails.show && (
+        <Viewer
+          path={showDetails.path}
+          type={showDetails.type}
+          title={showDetails.title}
+          format={showDetails.format}
+          privderType={showDetails.privderType}
+          onClose={() => setShowDetails({ show: false, path: '', type: '', title: '', format: '', privderType: '' })}
+        />
+      )}
+      <SettingItem title={t('resources.ruleProviders.title')} divider>
         <Button
           size="sm"
           color="primary"
@@ -50,47 +106,68 @@ const RuleProvider: React.FC = () => {
             })
           }}
         >
-          更新全部
+          {t('resources.ruleProviders.updateAll')}
         </Button>
       </SettingItem>
-      {providers.map((provider, index) => {
-        return (
-          <Fragment key={provider.name}>
-            <SettingItem
-              title={provider.name}
-              actions={
-                <Chip className="ml-2" size="sm">
-                  {provider.ruleCount}
-                </Chip>
-              }
-            >
-              {
-                <div className="flex h-[32px] leading-[32px] text-default-500">
-                  <div>{dayjs(provider.updatedAt).fromNow()}</div>
-                  <Button
-                    isIconOnly
-                    className="ml-2"
-                    size="sm"
-                    onPress={() => {
-                      onUpdate(provider.name, index)
-                    }}
-                  >
-                    <IoMdRefresh className={`text-lg ${updating[index] ? 'animate-spin' : ''}`} />
-                  </Button>
-                </div>
-              }
-            </SettingItem>
-            <SettingItem
-              title={<div className="text-default-500">{provider.format}</div>}
-              divider={index !== providers.length - 1}
-            >
-              <div className="h-[32px] leading-[32px] text-default-500">
-                {provider.vehicleType}::{provider.behavior}
-              </div>
-            </SettingItem>
-          </Fragment>
-        )
-      })}
+      {providers.map((provider, index) => (
+        <Fragment key={provider.name}>
+          <SettingItem
+            title={provider.name}
+            actions={
+              <Chip className="ml-2" size="sm">
+                {provider.ruleCount}
+              </Chip>
+            }
+          >
+            <div className="flex h-[32px] leading-[32px] text-foreground-500">
+              <div>{dayjs(provider.updatedAt).fromNow()}</div>
+              {provider.format !== 'MrsRule' && (
+                <Button
+                  isIconOnly
+                  title={provider.vehicleType == 'File' ? t('common.editor.edit') : t('common.viewer.view')}
+                  className="ml-2"
+                  size="sm"
+                  onPress={() => {
+                    setShowDetails({
+                      show: false,
+                      privderType: 'rule-providers',
+                      path: provider.name,
+                      type: provider.vehicleType,
+                      title: provider.name,
+                      format: provider.format
+                    })
+                  }}
+                >
+                  {provider.vehicleType == 'File' ? (
+                    <MdEditDocument className={`text-lg`} />
+                  ) : (
+                    <CgLoadbarDoc className={`text-lg`} />
+                  )}
+                </Button>
+              )}
+              <Button
+                isIconOnly
+                title={t('common.updater.update')}
+                className="ml-2"
+                size="sm"
+                onPress={() => {
+                  onUpdate(provider.name, index)
+                }}
+              >
+                <IoMdRefresh className={`text-lg ${updating[index] ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </SettingItem>
+          <SettingItem
+            title={<div className="text-foreground-500">{provider.format}</div>}
+            divider={index !== providers.length - 1}
+          >
+            <div className="h-[32px] leading-[32px] text-foreground-500">
+              {provider.vehicleType}::{provider.behavior}
+            </div>
+          </SettingItem>
+        </Fragment>
+      ))}
     </SettingCard>
   )
 }

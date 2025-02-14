@@ -5,10 +5,14 @@ import {
   ModalBody,
   ModalFooter,
   Button,
-  Input
-} from '@nextui-org/react'
+  Input,
+  Switch
+} from '@heroui/react'
 import React, { useState } from 'react'
 import SettingItem from '../base/base-setting-item'
+import { restartCore } from '@renderer/utils/ipc'
+import { useTranslation } from 'react-i18next'
+
 interface Props {
   item: IOverrideItem
   updateOverrideItem: (item: IOverrideItem) => Promise<void>
@@ -17,9 +21,11 @@ interface Props {
 const EditInfoModal: React.FC<Props> = (props) => {
   const { item, updateOverrideItem, onClose } = props
   const [values, setValues] = useState(item)
+  const { t } = useTranslation()
 
   const onSave = async (): Promise<void> => {
     await updateOverrideItem(values)
+    await restartCore()
     onClose()
   }
 
@@ -33,9 +39,9 @@ const EditInfoModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">编辑信息</ModalHeader>
+        <ModalHeader className="flex app-drag">{t('override.editInfo.title')}</ModalHeader>
         <ModalBody>
-          <SettingItem title="名称">
+          <SettingItem title={t('override.editInfo.name')}>
             <Input
               size="sm"
               className="w-[200px]"
@@ -46,7 +52,7 @@ const EditInfoModal: React.FC<Props> = (props) => {
             />
           </SettingItem>
           {values.type === 'remote' && (
-            <SettingItem title="地址">
+            <SettingItem title={t('override.editInfo.url')}>
               <Input
                 size="sm"
                 className="w-[200px]"
@@ -57,13 +63,22 @@ const EditInfoModal: React.FC<Props> = (props) => {
               />
             </SettingItem>
           )}
+          <SettingItem title={t('override.editInfo.global')}>
+            <Switch
+              size="sm"
+              isSelected={values.global}
+              onValueChange={(v) => {
+                setValues({ ...values, global: v })
+              }}
+            />
+          </SettingItem>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            取消
+          <Button size="sm" variant="light" onPress={onClose}>
+            {t('common.cancel')}
           </Button>
-          <Button color="primary" onPress={onSave}>
-            保存
+          <Button size="sm" color="primary" onPress={onSave}>
+            {t('common.save')}
           </Button>
         </ModalFooter>
       </ModalContent>

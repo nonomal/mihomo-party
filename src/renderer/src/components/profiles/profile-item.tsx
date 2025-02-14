@@ -8,17 +8,20 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
-  Progress
-} from '@nextui-org/react'
+  Progress,
+  Tooltip
+} from '@heroui/react'
 import { calcPercent, calcTraffic } from '@renderer/utils/calc'
 import { IoMdMore, IoMdRefresh } from 'react-icons/io'
-import dayjs from 'dayjs'
+import dayjs from '@renderer/utils/dayjs'
 import React, { Key, useEffect, useMemo, useState } from 'react'
 import EditFileModal from './edit-file-modal'
 import EditInfoModal from './edit-info-modal'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { openFile } from '@renderer/utils/ipc'
+import { useAppConfig } from '@renderer/hooks/use-app-config'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   info: IProfileItem
@@ -27,7 +30,7 @@ interface Props {
   updateProfileItem: (item: IProfileItem) => Promise<void>
   removeProfileItem: (id: string) => Promise<void>
   mutateProfileConfig: () => void
-  onClick: () => Promise<void>
+  onPress: () => Promise<void>
 }
 
 interface MenuItem {
@@ -38,18 +41,21 @@ interface MenuItem {
   className: string
 }
 const ProfileItem: React.FC<Props> = (props) => {
+  const { t } = useTranslation()
   const {
     info,
     addProfileItem,
     removeProfileItem,
     mutateProfileConfig,
     updateProfileItem,
-    onClick,
+    onPress,
     isCurrent
   } = props
   const extra = info?.extra
   const usage = (extra?.upload ?? 0) + (extra?.download ?? 0)
   const total = extra?.total ?? 0
+  const { appConfig, patchAppConfig } = useAppConfig()
+  const { profileDisplayDate = 'expire' } = appConfig || {}
   const [updating, setUpdating] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [openInfoEditor, setOpenInfoEditor] = useState(false)
@@ -71,28 +77,28 @@ const ProfileItem: React.FC<Props> = (props) => {
     const list = [
       {
         key: 'edit-info',
-        label: '编辑信息',
+        label: t('profiles.editInfo.title'),
         showDivider: false,
         color: 'default',
         className: ''
       } as MenuItem,
       {
         key: 'edit-file',
-        label: '编辑文件',
+        label: t('profiles.editFile.title'),
         showDivider: false,
         color: 'default',
         className: ''
       } as MenuItem,
       {
         key: 'open-file',
-        label: '打开文件',
+        label: t('profiles.openFile'),
         showDivider: true,
         color: 'default',
         className: ''
       } as MenuItem,
       {
         key: 'delete',
-        label: '删除',
+        label: t('common.delete'),
         showDivider: false,
         color: 'danger',
         className: 'text-danger'
@@ -101,14 +107,14 @@ const ProfileItem: React.FC<Props> = (props) => {
     if (info.home) {
       list.unshift({
         key: 'home',
-        label: '主页',
+        label: t('profiles.home'),
         showDivider: false,
         color: 'default',
         className: ''
       } as MenuItem)
     }
     return list
-  }, [info])
+  }, [info, t])
 
   const onMenuAction = async (key: Key): Promise<void> => {
     switch (key) {
@@ -168,109 +174,145 @@ const ProfileItem: React.FC<Props> = (props) => {
         />
       )}
       <Card
+        as="div"
         fullWidth
         isPressable
         onPress={() => {
           if (disableSelect) return
           setSelecting(true)
-          onClick().finally(() => {
+          onPress().finally(() => {
             setSelecting(false)
           })
         }}
         className={`${isCurrent ? 'bg-primary' : ''} ${selecting ? 'blur-sm' : ''}`}
       >
-        <CardBody className="pb-1">
-          <div className="flex justify-between h-[32px]">
-            <h3
-              ref={setNodeRef}
-              {...attributes}
-              {...listeners}
-              title={info?.name}
-              className={`text-ellipsis whitespace-nowrap overflow-hidden text-md font-bold leading-[32px] ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              {info?.name}
-            </h3>
-            <div className="flex">
-              {info.type === 'remote' && (
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="light"
-                  color="default"
-                  title={dayjs(info.updated).fromNow()}
-                  disabled={updating}
-                  onPress={async () => {
-                    setUpdating(true)
-                    await addProfileItem(info)
-                    setUpdating(false)
-                  }}
-                >
-                  <IoMdRefresh
-                    color="default"
-                    className={`${isCurrent ? 'text-white' : 'text-foreground'} text-[24px] ${updating ? 'animate-spin' : ''}`}
-                  />
-                </Button>
-              )}
-
-              <Dropdown>
-                <DropdownTrigger>
-                  <Button isIconOnly size="sm" variant="light" color="default">
-                    <IoMdMore
-                      color="default"
-                      className={`text-[24px] ${isCurrent ? 'text-white' : 'text-foreground'}`}
-                    />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu onAction={onMenuAction}>
-                  {menuItems.map((item) => (
-                    <DropdownItem
-                      showDivider={item.showDivider}
-                      key={item.key}
-                      color={item.color}
-                      className={item.className}
-                    >
-                      {item.label}
-                    </DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-          </div>
-          {info.type === 'remote' && extra && (
-            <div
-              className={`mt-2 flex justify-between ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              <small>{`${calcTraffic(usage)}/${calcTraffic(total)}`}</small>
-              <small>
-                {extra.expire ? dayjs.unix(extra.expire).format('YYYY-MM-DD') : '长期有效'}
-              </small>
-            </div>
-          )}
-          {info.type === 'local' && (
-            <div
-              className={`mt-2 flex justify-between ${isCurrent ? 'text-white' : 'text-foreground'}`}
-            >
-              <Chip
-                size="sm"
-                variant="bordered"
-                className={`${isCurrent ? 'text-white border-white' : 'border-primary text-primary'}`}
+        <div ref={setNodeRef} {...attributes} {...listeners} className="w-full h-full">
+          <CardBody className="pb-1">
+            <div className="flex justify-between h-[32px]">
+              <h3
+                title={info?.name}
+                className={`text-ellipsis whitespace-nowrap overflow-hidden text-md font-bold leading-[32px] ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
               >
-                本地
-              </Chip>
+                {info?.name}
+              </h3>
+              <div className="flex">
+                {info.type === 'remote' && (
+                  <Tooltip placement="left" content={dayjs(info.updated).fromNow()}>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="default"
+                      disabled={updating}
+                      onPress={async () => {
+                        setUpdating(true)
+                        await addProfileItem(info)
+                        setUpdating(false)
+                      }}
+                    >
+                      <IoMdRefresh
+                        color="default"
+                        className={`${isCurrent ? 'text-primary-foreground' : 'text-foreground'} text-[24px] ${updating ? 'animate-spin' : ''}`}
+                      />
+                    </Button>
+                  </Tooltip>
+                )}
+
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Button isIconOnly size="sm" variant="light" color="default">
+                      <IoMdMore
+                        color="default"
+                        className={`text-[24px] ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                      />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu onAction={onMenuAction}>
+                    {menuItems.map((item) => (
+                      <DropdownItem
+                        showDivider={item.showDivider}
+                        key={item.key}
+                        color={item.color}
+                        className={item.className}
+                      >
+                        {item.label}
+                      </DropdownItem>
+                    ))}
+                  </DropdownMenu>
+                </Dropdown>
+              </div>
             </div>
-          )}
-        </CardBody>
-        <CardFooter className="pt-0">
-          {extra && (
-            <Progress
-              className="w-full"
-              classNames={{
-                indicator: isCurrent ? 'bg-white' : 'bg-foreground'
-              }}
-              value={calcPercent(extra?.upload, extra?.download, extra?.total)}
-            />
-          )}
-        </CardFooter>
+            {info.type === 'remote' && extra && (
+              <div
+                className={`mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <small>{`${calcTraffic(usage)}/${calcTraffic(total)}`}</small>
+                {profileDisplayDate === 'expire' ? (
+                  <Button
+                    size="sm"
+                    variant="light"
+                    className={`h-[20px] p-1 m-0 ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                    onPress={async () => {
+                      await patchAppConfig({ profileDisplayDate: 'update' })
+                    }}
+                  >
+                    {extra.expire ? dayjs.unix(extra.expire).format('YYYY-MM-DD') : t('profiles.neverExpire')}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="light"
+                    className={`h-[20px] p-1 m-0 ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+                    onPress={async () => {
+                      await patchAppConfig({ profileDisplayDate: 'expire' })
+                    }}
+                  >
+                    {dayjs(info.updated).fromNow()}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardBody>
+          <CardFooter className="pt-0">
+            {info.type === 'remote' && !extra && (
+              <div
+                className={`w-full mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <Chip
+                  size="sm"
+                  variant="bordered"
+                  className={`${isCurrent ? 'text-primary-foreground border-primary-foreground' : 'border-primary text-primary'}`}
+                >
+                    {t('profiles.remote')}
+                </Chip>
+                <small>{dayjs(info.updated).fromNow()}</small>
+              </div>
+            )}
+            {info.type === 'local' && (
+              <div
+                className={`mt-2 flex justify-between ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <Chip
+                  size="sm"
+                  variant="bordered"
+                  className={`${isCurrent ? 'text-primary-foreground border-primary-foreground' : 'border-primary text-primary'}`}
+                >
+                    {t('profiles.local')}
+                </Chip>
+              </div>
+            )}
+            {extra && (
+              <Progress
+                className="w-full"
+                  aria-label={t('profiles.trafficUsage')}
+                classNames={{
+                  indicator: isCurrent ? 'bg-primary-foreground' : 'bg-foreground'
+                }}
+                value={calcPercent(extra?.upload, extra?.download, extra?.total)}
+              />
+            )}
+          </CardFooter>
+        </div>
       </Card>
     </div>
   )

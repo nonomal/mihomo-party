@@ -1,7 +1,9 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@nextui-org/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
 import React, { useEffect, useState } from 'react'
 import { BaseEditor } from '../base/base-editor'
 import { getOverride, restartCore, setOverride } from '@renderer/utils/ipc'
+import { useTranslation } from 'react-i18next'
+
 interface Props {
   id: string
   language: 'javascript' | 'yaml'
@@ -10,6 +12,7 @@ interface Props {
 const EditFileModal: React.FC<Props> = (props) => {
   const { id, language, onClose } = props
   const [currData, setCurrData] = useState('')
+  const { t } = useTranslation()
 
   const getContent = async (): Promise<void> => {
     setCurrData(await getOverride(id, language === 'javascript' ? 'js' : 'yaml'))
@@ -30,8 +33,10 @@ const EditFileModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent className="h-full w-[calc(100%-100px)]">
-        <ModalHeader className="flex pb-0">
-          编辑覆写{language === 'javascript' ? '脚本' : '配置'}
+        <ModalHeader className="flex pb-0 app-drag">
+          {t('override.editFile.title', {
+            type: language === 'javascript' ? t('override.editFile.script') : t('override.editFile.config')
+          })}
         </ModalHeader>
         <ModalBody className="h-full">
           <BaseEditor
@@ -42,7 +47,7 @@ const EditFileModal: React.FC<Props> = (props) => {
         </ModalBody>
         <ModalFooter className="pt-0">
           <Button size="sm" variant="light" onPress={onClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             size="sm"
@@ -57,7 +62,7 @@ const EditFileModal: React.FC<Props> = (props) => {
               }
             }}
           >
-            确认
+            {t('common.confirm')}
           </Button>
         </ModalFooter>
       </ModalContent>

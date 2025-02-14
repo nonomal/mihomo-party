@@ -2,18 +2,15 @@ type OutboundMode = 'rule' | 'global' | 'direct'
 type LogLevel = 'info' | 'debug' | 'warning' | 'error' | 'silent'
 type SysProxyMode = 'auto' | 'manual'
 type CardStatus = 'col-span-2' | 'col-span-1' | 'hidden'
-type AppTheme =
-  | 'system'
-  | 'light'
-  | 'dark'
-  | 'gray'
-  | 'light-pink'
-  | 'dark-pink'
-  | 'gray-pink'
-  | 'light-green'
-  | 'dark-green'
-  | 'gray-green'
+type AppTheme = 'system' | 'light' | 'dark'
 type MihomoGroupType = 'Selector' | 'URLTest' | 'LoadBalance' | 'Relay'
+type Priority =
+  | 'PRIORITY_LOW'
+  | 'PRIORITY_BELOW_NORMAL'
+  | 'PRIORITY_NORMAL'
+  | 'PRIORITY_ABOVE_NORMAL'
+  | 'PRIORITY_HIGH'
+  | 'PRIORITY_HIGHEST'
 type MihomoProxyType =
   | 'Direct'
   | 'Reject'
@@ -37,6 +34,7 @@ type MihomoProxyType =
 type TunStack = 'gvisor' | 'mixed' | 'system'
 type FindProcessMode = 'off' | 'strict' | 'always'
 type DnsMode = 'normal' | 'fake-ip' | 'redir-host'
+type FilterMode = 'blacklist' | 'whitelist'
 type NetworkInterfaceInfo = os.NetworkInterfaceInfo
 
 interface IAppVersion {
@@ -85,12 +83,15 @@ interface IMihomoConnectionsInfo {
 
 interface IMihomoConnectionDetail {
   id: string
+  isActive: boolean
   metadata: {
     network: 'tcp' | 'udp'
     type: string
     sourceIP: string
+    sourceGeoIP: string[]
+    sourceIPASN: string
     destinationIP: string
-    destinationGeoIP: string
+    destinationGeoIP: string[]
     destinationIPASN: string
     sourcePort: string
     destinationPort: string
@@ -141,6 +142,8 @@ interface IMihomoProxy {
   type: MihomoProxyType
   udp: boolean
   xudp: boolean
+  mptcp: boolean
+  smux: boolean
 }
 
 interface IMihomoGroup {
@@ -214,15 +217,24 @@ interface ISysProxyConfig {
 
 interface IAppConfig {
   core: 'mihomo' | 'mihomo-alpha'
+  disableLoopbackDetector: boolean
+  disableEmbedCA: boolean
+  disableSystemCA: boolean
+  skipSafePathCheck: boolean
   proxyDisplayMode: 'simple' | 'full'
   proxyDisplayOrder: 'default' | 'delay' | 'name'
-  envType?: 'bash' | 'cmd' | 'powershell'
+  profileDisplayDate?: 'expire' | 'update'
+  envType?: ('bash' | 'cmd' | 'powershell')[]
   proxyCols: 'auto' | '1' | '2' | '3' | '4'
   connectionDirection: 'asc' | 'desc'
   connectionOrderBy: 'time' | 'upload' | 'download' | 'uploadSpeed' | 'downloadSpeed'
+  spinFloatingIcon?: boolean
+  disableTray?: boolean
+  showFloatingWindow?: boolean
   connectionCardStatus?: CardStatus
   dnsCardStatus?: CardStatus
   logCardStatus?: CardStatus
+  pauseSSID?: string[]
   mihomoCoreCardStatus?: CardStatus
   overrideCardStatus?: CardStatus
   profileCardStatus?: CardStatus
@@ -233,21 +245,34 @@ interface IAppConfig {
   substoreCardStatus?: CardStatus
   sysproxyCardStatus?: CardStatus
   tunCardStatus?: CardStatus
+  githubToken?: string
   useSubStore: boolean
+  subStoreHost?: string
+  subStoreBackendSyncCron?: string
+  subStoreBackendDownloadCron?: string
+  subStoreBackendUploadCron?: string
+  autoQuitWithoutCore?: boolean
+  autoQuitWithoutCoreDelay?: number
   useCustomSubStore?: boolean
+  useProxyInSubStore?: boolean
+  mihomoCpuPriority?: Priority
   customSubStoreUrl?: string
+  diffWorkDir?: boolean
   autoSetDNS?: boolean
   originDNS?: string
   useWindowFrame: boolean
   proxyInTray: boolean
   siderOrder: string[]
+  siderWidth: number
   appTheme: AppTheme
+  customTheme?: string
   autoCheckUpdate: boolean
   silentStart: boolean
   autoCloseConnection: boolean
   sysProxy: ISysProxyConfig
   maxLogDays: number
   userAgent?: string
+  delayTestConcurrency?: number
   delayTestUrl?: string
   delayTestTimeout?: number
   encryptedPassword?: number[]
@@ -256,11 +281,13 @@ interface IAppConfig {
   useDockIcon?: boolean
   showTraffic?: boolean
   webdavUrl?: string
+  webdavDir?: string
   webdavUsername?: string
   webdavPassword?: string
   useNameserverPolicy: boolean
   nameserverPolicy: { [key: string]: string | string[] }
   showWindowShortcut?: string
+  showFloatingWindowShortcut?: string
   triggerSysProxyShortcut?: string
   triggerTunShortcut?: string
   ruleModeShortcut?: string
@@ -268,6 +295,7 @@ interface IAppConfig {
   directModeShortcut?: string
   restartAppShortcut?: string
   quitWithoutCoreShortcut?: string
+  language?: 'zh-CN' | 'en-US' | 'ru-RU' | 'fa-IR'
 }
 
 interface IMihomoTunConfig {
@@ -302,18 +330,26 @@ interface IMihomoTunConfig {
 }
 interface IMihomoDNSConfig {
   enable?: boolean
+  listen?: string
   ipv6?: boolean
+  'ipv6-timeout'?: number
+  'prefer-h3'?: boolean
   'enhanced-mode'?: DnsMode
   'fake-ip-range'?: string
   'fake-ip-filter'?: string[]
+  'fake-ip-filter-mode'?: FilterMode
   'use-hosts'?: boolean
   'use-system-hosts'?: boolean
   'respect-rules'?: boolean
+  'default-nameserver'?: string[]
   nameserver?: string[]
   fallback?: string[]
   'fallback-filter'?: { [key: string]: boolean | string | string[] }
   'proxy-server-nameserver'?: string[]
+  'direct-nameserver'?: string[]
+  'direct-nameserver-follow-policy'?: boolean
   'nameserver-policy'?: { [key: string]: string | string[] }
+  'cache-algorithm'?: string
 }
 
 interface IMihomoSnifferConfig {
@@ -323,6 +359,8 @@ interface IMihomoSnifferConfig {
   'force-dns-mapping'?: boolean
   'force-domain'?: string[]
   'skip-domain'?: string[]
+  'skip-dst-address'?: string[]
+  'skip-src-address'?: string[]
   sniff?: {
     HTTP?: {
       ports: (number | string)[]
@@ -343,6 +381,8 @@ interface IMihomoProfileConfig {
 }
 
 interface IMihomoConfig {
+  'external-controller-pipe': string
+  'external-controller-unix': string
   'external-controller': string
   secret?: string
   ipv6: boolean
@@ -356,6 +396,11 @@ interface IMihomoConfig {
   'socks-port'?: number
   'redir-port'?: number
   'tproxy-port'?: number
+  'skip-auth-prefixes'?: string[]
+  'bind-address'?: string
+  'lan-allowed-ips'?: string[]
+  'lan-disallowed-ips'?: string[]
+  authentication: string[]
   port?: number
   proxies?: []
   'proxy-groups'?: []
@@ -387,6 +432,7 @@ interface IOverrideItem {
   ext: 'js' | 'yaml'
   name: string
   updated: number
+  global?: boolean
   url?: string
   file?: string
 }
@@ -414,6 +460,7 @@ interface IProfileItem {
   override?: string[]
   useProxy?: boolean
   extra?: ISubscriptionUserInfo
+  substore?: boolean
 }
 
 interface ISubStoreSub {

@@ -1,15 +1,24 @@
-import { Button, Card, CardBody, CardFooter, Chip } from '@nextui-org/react'
+import { Button, Card, CardBody, CardFooter, Chip, Tooltip } from '@heroui/react'
 import { MdOutlineAltRoute } from 'react-icons/md'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useRules } from '@renderer/hooks/use-rules'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
+import React from 'react'
+import { useTranslation } from 'react-i18next'
 
-const RuleCard: React.FC = () => {
+interface Props {
+  iconOnly?: boolean
+}
+
+const RuleCard: React.FC<Props> = (props) => {
+  const { t } = useTranslation()
   const { appConfig } = useAppConfig()
+  const { iconOnly } = props
   const { ruleCardStatus = 'col-span-1' } = appConfig || {}
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/rules')
   const { rules } = useRules()
   const {
@@ -23,6 +32,26 @@ const RuleCard: React.FC = () => {
     id: 'rule'
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
+
+  if (iconOnly) {
+    return (
+      <div className={`${ruleCardStatus} flex justify-center`}>
+        <Tooltip content={t('sider.cards.rules')} placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/rules')
+            }}
+          >
+            <MdOutlineAltRoute className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
   return (
     <div
       style={{
@@ -31,7 +60,7 @@ const RuleCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={ruleCardStatus}
+      className={`${ruleCardStatus} rule-card`}
     >
       <Card
         fullWidth
@@ -50,15 +79,15 @@ const RuleCard: React.FC = () => {
             >
               <MdOutlineAltRoute
                 color="default"
-                className={`${match ? 'text-white' : 'text-foreground'} text-[24px]`}
+                className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px]`}
               />
             </Button>
             <Chip
               classNames={
                 match
                   ? {
-                      base: 'border-white',
-                      content: 'text-white'
+                      base: 'border-primary-foreground',
+                      content: 'text-primary-foreground'
                     }
                   : {
                       base: 'border-primary',
@@ -74,7 +103,11 @@ const RuleCard: React.FC = () => {
           </div>
         </CardBody>
         <CardFooter className="pt-1">
-          <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>规则</h3>
+          <h3
+            className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+          >
+            {t('sider.cards.rules')}
+          </h3>
         </CardFooter>
       </Card>
     </div>

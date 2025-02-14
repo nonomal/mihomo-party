@@ -1,14 +1,15 @@
-import { Button, Input, Tab, Tabs } from '@nextui-org/react'
+import { Button, Input, Tab, Tabs } from '@heroui/react'
 import BasePage from '@renderer/components/base/base-page'
 import SettingCard from '@renderer/components/base/base-setting-card'
 import SettingItem from '@renderer/components/base/base-setting-item'
-import PacEditorViewer from '@renderer/components/sysproxy/pac-editor-modal'
+import PacEditorModal from '@renderer/components/sysproxy/pac-editor-modal'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { platform } from '@renderer/utils/init'
 import { openUWPTool, triggerSysProxy } from '@renderer/utils/ipc'
 import { Key, useState } from 'react'
 import React from 'react'
 import { MdDeleteForever } from 'react-icons/md'
+import { useTranslation } from 'react-i18next'
 
 const defaultBypass: string[] =
   platform === 'linux'
@@ -55,6 +56,7 @@ function FindProxyForURL(url, host) {
 `
 
 const Sysproxy: React.FC = () => {
+  const { t } = useTranslation()
   const { appConfig, patchAppConfig } = useAppConfig()
   const { sysProxy } = appConfig || ({ sysProxy: { enable: false } } as IAppConfig)
   const [changed, setChanged] = useState(false)
@@ -104,17 +106,17 @@ const Sysproxy: React.FC = () => {
 
   return (
     <BasePage
-      title="系统代理设置"
+      title={t('sysproxy.title')}
       header={
         changed && (
           <Button color="primary" className="app-nodrag" size="sm" onPress={onSave}>
-            保存
+            {t('common.save')}
           </Button>
         )
       }
     >
       {openPacEditor && (
-        <PacEditorViewer
+        <PacEditorModal
           script={values.pacScript || defaultPacScript}
           onCancel={() => setOpenPacEditor(false)}
           onConfirm={(script: string) => {
@@ -123,69 +125,69 @@ const Sysproxy: React.FC = () => {
           }}
         />
       )}
-      <SettingCard>
-        <SettingItem title="代理主机" divider>
+      <SettingCard className="sysproxy-settings">
+        <SettingItem title={t('sysproxy.host.title')} divider>
           <Input
             size="sm"
             className="w-[50%]"
             value={values.host}
-            placeholder="默认 127.0.0.1 若无特殊需求请勿修改"
+            placeholder={t('sysproxy.host.placeholder')}
             onValueChange={(v) => {
               setValues({ ...values, host: v })
             }}
           />
         </SettingItem>
-        <SettingItem title="代理模式" divider>
+        <SettingItem title={t('sysproxy.mode.title')} divider>
           <Tabs
             size="sm"
             color="primary"
             selectedKey={values.mode}
             onSelectionChange={(key: Key) => setValues({ ...values, mode: key as SysProxyMode })}
           >
-            <Tab key="manual" title="手动" />
-            <Tab key="auto" title="PAC" />
+            <Tab key="manual" title={t('sysproxy.mode.manual')} />
+            <Tab key="auto" title={t('sysproxy.mode.pac')} />
           </Tabs>
         </SettingItem>
         {platform === 'win32' && (
-          <SettingItem title="UWP 工具" divider>
+          <SettingItem title={t('sysproxy.uwp.title')} divider>
             <Button
               size="sm"
               onPress={async () => {
                 await openUWPTool()
               }}
             >
-              打开 UWP 工具
+              {t('sysproxy.uwp.open')}
             </Button>
           </SettingItem>
         )}
 
         {values.mode === 'auto' && (
-          <SettingItem title="代理模式">
+          <SettingItem title={t('sysproxy.mode.title')}>
             <Button size="sm" onPress={() => setOpenPacEditor(true)} variant="bordered">
-              编辑 PAC 脚本
+              {t('sysproxy.pac.edit')}
             </Button>
           </SettingItem>
         )}
         {values.mode === 'manual' && (
           <>
-            <SettingItem title="添加默认代理绕过" divider>
+            <SettingItem title={t('sysproxy.bypass.addDefault')} divider>
               <Button
                 size="sm"
                 onPress={() => {
                   setValues({ ...values, bypass: defaultBypass.concat(values.bypass) })
                 }}
               >
-                添加默认代理绕过
+                {t('sysproxy.bypass.addDefault')}
               </Button>
             </SettingItem>
             <div className="flex flex-col items-stretch">
-              <h3 className="mb-2">代理绕过</h3>
+              <h3 className="mb-2">{t('sysproxy.bypass.title')}</h3>
               {[...values.bypass, ''].map((domain, index) => (
                 <div key={index} className="mb-2 flex">
                   <Input
                     fullWidth
                     size="sm"
-                    placeholder="例: *.baidu.com"
+                    placeholder={t('sysproxy.bypass.placeholder')}
                     value={domain}
                     onValueChange={(v) => handleBypassChange(v, index)}
                   />
@@ -195,7 +197,7 @@ const Sysproxy: React.FC = () => {
                       size="sm"
                       variant="flat"
                       color="warning"
-                      onClick={() => handleBypassChange('', index)}
+                      onPress={() => handleBypassChange('', index)}
                     >
                       <MdDeleteForever className="text-lg" />
                     </Button>

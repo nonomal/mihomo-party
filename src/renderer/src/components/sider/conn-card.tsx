@@ -1,28 +1,34 @@
-import { Button, Card, CardBody, CardFooter } from '@nextui-org/react'
+import { Button, Card, CardBody, CardFooter, Tooltip } from '@heroui/react'
 import { FaCircleArrowDown, FaCircleArrowUp } from 'react-icons/fa6'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { calcTraffic } from '@renderer/utils/calc'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IoLink } from 'react-icons/io5'
-import Chart from 'react-apexcharts'
-import { ApexOptions } from 'apexcharts'
 import { useTheme } from 'next-themes'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { platform } from '@renderer/utils/init'
+import { Area, AreaChart, ResponsiveContainer } from 'recharts'
+import { useTranslation } from 'react-i18next'
 
 let currentUpload: number | undefined = undefined
 let currentDownload: number | undefined = undefined
 let hasShowTraffic = false
 let drawing = false
 
-const ConnCard: React.FC = () => {
+interface Props {
+  iconOnly?: boolean
+}
+const ConnCard: React.FC<Props> = (props) => {
   const { theme = 'system', systemTheme = 'dark' } = useTheme()
+  const { iconOnly } = props
   const { appConfig } = useAppConfig()
-  const { showTraffic, connectionCardStatus = 'col-span-2' } = appConfig || {}
+  const { showTraffic = false, connectionCardStatus = 'col-span-2', customTheme } = appConfig || {}
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/connections')
+  const { t } = useTranslation()
 
   const [upload, setUpload] = useState(0)
   const [download, setDownload] = useState(0)
@@ -36,102 +42,27 @@ const ConnCard: React.FC = () => {
   } = useSortable({
     id: 'connection'
   })
-  const [series, setSeries] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-  const getApexChartOptions = (): ApexOptions => {
-    const islight = theme === 'system' ? systemTheme === 'light' : theme.includes('light')
-    const primaryColor = match
-      ? 'rgba(255,255,255,0.6)'
-      : islight
-        ? 'rgba(0,0,0,0.6)'
-        : 'rgba(255,255,255,0.6)'
-    const transparentColor = match
-      ? 'rgba(255,255,255,0)'
-      : islight
-        ? 'rgba(0,0,0,0)'
-        : 'rgba(255,255,255,0)'
-    return {
-      chart: {
-        background: 'transparent',
-        stacked: false,
-        toolbar: {
-          show: false
-        },
-        animations: {
-          enabled: false
-        },
-        parentHeightOffset: 0,
-        sparkline: {
-          enabled: false
-        }
-      },
-      colors: [primaryColor],
-      stroke: {
-        show: false,
-        curve: 'smooth',
-        width: 0
-      },
-      fill: {
-        type: 'gradient',
-        gradient: {
-          type: 'vertical',
-          shadeIntensity: 0,
-          gradientToColors: [transparentColor, primaryColor],
-          inverseColors: false,
-          opacityTo: 0,
-          stops: [0, 100]
-        }
-      },
-      dataLabels: {
-        enabled: false
-      },
-      plotOptions: {
-        bar: {
-          horizontal: false
-        }
-      },
+  const [series, setSeries] = useState(Array(10).fill(0))
+  const [chartColor, setChartColor] = useState('rgba(255,255,255)')
 
-      xaxis: {
-        labels: {
-          show: false
-        },
-        axisTicks: {
-          show: false
-        },
-        axisBorder: {
-          show: false
-        }
-      },
-      yaxis: {
-        labels: {
-          show: false
-        },
-        min: 0
-      },
-      tooltip: {
-        enabled: false
-      },
-      legend: {
-        show: false
-      },
-      grid: {
-        show: false,
-        padding: {
-          left: -10,
-          right: 0,
-          bottom: -15,
-          top: 30
-        },
-        column: {
-          opacity: 0
-        },
-        xaxis: {
-          lines: {
-            show: false
-          }
-        }
-      }
-    }
-  }
+  useEffect(() => {
+    setChartColor(
+      match
+        ? `hsla(${getComputedStyle(document.documentElement).getPropertyValue('--heroui-primary-foreground')})`
+        : `hsla(${getComputedStyle(document.documentElement).getPropertyValue('--heroui-foreground')})`
+    )
+  }, [theme, systemTheme, match])
+
+  useEffect(() => {
+    setTimeout(() => {
+      setChartColor(
+        match
+          ? `hsla(${getComputedStyle(document.documentElement).getPropertyValue('--heroui-primary-foreground')})`
+          : `hsla(${getComputedStyle(document.documentElement).getPropertyValue('--heroui-foreground')})`
+      )
+    }, 200)
+  }, [customTheme])
+
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
   useEffect(() => {
     window.electron.ipcRenderer.on('mihomoTraffic', async (_e, info: IMihomoTrafficInfo) => {
@@ -163,6 +94,26 @@ const ConnCard: React.FC = () => {
     }
   }, [showTraffic])
 
+  if (iconOnly) {
+    return (
+      <div className={`${connectionCardStatus} flex justify-center`}>
+        <Tooltip content={t('sider.cards.connections')} placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/connections')
+            }}
+          >
+            <IoLink className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -171,7 +122,7 @@ const ConnCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={connectionCardStatus}
+      className={`${connectionCardStatus} conn-card`}
     >
       {connectionCardStatus === 'col-span-2' ? (
         <>
@@ -192,10 +143,12 @@ const ConnCard: React.FC = () => {
                 >
                   <IoLink
                     color="default"
-                    className={`${match ? 'text-white' : 'text-foreground'} text-[24px]`}
+                    className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px]`}
                   />
                 </Button>
-                <div className={`p-2 w-full ${match ? 'text-white' : 'text-foreground'} `}>
+                <div
+                  className={`p-2 w-full ${match ? 'text-primary-foreground' : 'text-foreground'} `}
+                >
                   <div className="flex justify-between">
                     <div className="w-full text-right mr-2">{calcTraffic(upload)}/s</div>
                     <FaCircleArrowUp className="h-[24px] leading-[24px]" />
@@ -208,20 +161,37 @@ const ConnCard: React.FC = () => {
               </div>
             </CardBody>
             <CardFooter className="pt-1">
-              <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>
-                连接
+              <h3
+                className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                {t('sider.cards.connections')}
               </h3>
             </CardFooter>
           </Card>
-          <div className="w-full h-full absolute top-0 left-0 pointer-events-none rounded-[14px] overflow-hidden">
-            <Chart
-              options={getApexChartOptions()}
-              series={[{ name: 'Total', data: series }]}
-              height={'100%'}
-              width={'100%'}
-              type="area"
-            />
-          </div>
+          <ResponsiveContainer
+            height="100%"
+            width="100%"
+            className="w-full h-full absolute top-0 left-0 pointer-events-none overflow-hidden rounded-[14px]"
+          >
+            <AreaChart
+              data={series.map((v) => ({ traffic: v }))}
+              margin={{ top: 50, right: 0, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartColor} stopOpacity={0.8} />
+                  <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                isAnimationActive={false}
+                type="monotone"
+                dataKey="traffic"
+                stroke="none"
+                fill="url(#gradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </>
       ) : (
         <Card
@@ -241,14 +211,16 @@ const ConnCard: React.FC = () => {
               >
                 <IoLink
                   color="default"
-                  className={`${match ? 'text-white' : 'text-foreground'} text-[24px] font-bold`}
+                  className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px] font-bold`}
                 />
               </Button>
             </div>
           </CardBody>
           <CardFooter className="pt-1">
-            <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>
-              连接
+            <h3
+              className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+            >
+              {t('sider.cards.connections')}
             </h3>
           </CardFooter>
         </Card>

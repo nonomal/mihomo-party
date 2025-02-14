@@ -1,6 +1,8 @@
 import {
+  changeCurrentProfile,
   getAppConfig,
   getControledMihomoConfig,
+  getProfileConfig,
   patchAppConfig,
   patchControledMihomoConfig
 } from '../config'
@@ -13,21 +15,30 @@ import {
   mihomoGroups,
   patchMihomoConfig
 } from '../core/mihomoApi'
-import { mainWindow, showMainWindow } from '..'
+import { mainWindow, showMainWindow, triggerMainWindow } from '..'
 import { app, clipboard, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { dataDir, logDir, mihomoCoreDir, mihomoWorkDir } from '../utils/dirs'
 import { triggerSysProxy } from '../sys/sysproxy'
 import { quitWithoutCore, restartCore } from '../core/manager'
+import { floatingWindow, triggerFloatingWindow } from './floatingWindow'
+import { t } from 'i18next'
 
 export let tray: Tray | null = null
 
-const buildContextMenu = async (): Promise<Menu> => {
+export const buildContextMenu = async (): Promise<Menu> => {
+  // 添加调试日志
+  console.log('Current translation for tray.showWindow:', t('tray.showWindow'))
+  console.log('Current translation for tray.hideFloatingWindow:', t('tray.hideFloatingWindow'))
+  console.log('Current translation for tray.showFloatingWindow:', t('tray.showFloatingWindow'))
+
   const { mode, tun } = await getControledMihomoConfig()
   const {
     sysProxy,
+    envType = process.platform === 'win32' ? ['powershell'] : ['bash'],
     autoCloseConnection,
     proxyInTray = true,
     triggerSysProxyShortcut = '',
+    showFloatingWindowShortcut = '',
     showWindowShortcut = '',
     triggerTunShortcut = '',
     ruleModeShortcut = '',
@@ -75,20 +86,30 @@ const buildContextMenu = async (): Promise<Menu> => {
       // 避免出错时无法创建托盘菜单
     }
   }
+  const { current, items = [] } = await getProfileConfig()
 
   const contextMenu = [
     {
       id: 'show',
       accelerator: showWindowShortcut,
-      label: '显示窗口',
+      label: t('tray.showWindow'),
       type: 'normal',
       click: (): void => {
         showMainWindow()
       }
     },
     {
+      id: 'show-floating',
+      accelerator: showFloatingWindowShortcut,
+      label: floatingWindow?.isVisible() ? t('tray.hideFloatingWindow') : t('tray.showFloatingWindow'),
+      type: 'normal',
+      click: async (): Promise<void> => {
+        await triggerFloatingWindow()
+      }
+    },
+    {
       id: 'rule',
-      label: '规则模式',
+      label: t('tray.ruleMode'),
       accelerator: ruleModeShortcut,
       type: 'radio',
       checked: mode === 'rule',
@@ -96,12 +117,13 @@ const buildContextMenu = async (): Promise<Menu> => {
         await patchControledMihomoConfig({ mode: 'rule' })
         await patchMihomoConfig({ mode: 'rule' })
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
+        mainWindow?.webContents.send('groupsUpdated')
         ipcMain.emit('updateTrayMenu')
       }
     },
     {
       id: 'global',
-      label: '全局模式',
+      label: t('tray.globalMode'),
       accelerator: globalModeShortcut,
       type: 'radio',
       checked: mode === 'global',
@@ -109,12 +131,13 @@ const buildContextMenu = async (): Promise<Menu> => {
         await patchControledMihomoConfig({ mode: 'global' })
         await patchMihomoConfig({ mode: 'global' })
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
+        mainWindow?.webContents.send('groupsUpdated')
         ipcMain.emit('updateTrayMenu')
       }
     },
     {
       id: 'direct',
-      label: '直连模式',
+      label: t('tray.directMode'),
       accelerator: directModeShortcut,
       type: 'radio',
       checked: mode === 'direct',
@@ -122,13 +145,14 @@ const buildContextMenu = async (): Promise<Menu> => {
         await patchControledMihomoConfig({ mode: 'direct' })
         await patchMihomoConfig({ mode: 'direct' })
         mainWindow?.webContents.send('controledMihomoConfigUpdated')
+        mainWindow?.webContents.send('groupsUpdated')
         ipcMain.emit('updateTrayMenu')
       }
     },
     { type: 'separator' },
     {
       type: 'checkbox',
-      label: '系统代理',
+      label: t('tray.systemProxy'),
       accelerator: triggerSysProxyShortcut,
       checked: sysProxy.enable,
       click: async (item): Promise<void> => {
@@ -136,76 +160,118 @@ const buildContextMenu = async (): Promise<Menu> => {
         try {
           await triggerSysProxy(enable)
           await patchAppConfig({ sysProxy: { enable } })
+          mainWindow?.webContents.send('appConfigUpdated')
+          floatingWindow?.webContents.send('appConfigUpdated')
         } catch (e) {
           // ignore
         } finally {
-          mainWindow?.webContents.send('appConfigUpdated')
           ipcMain.emit('updateTrayMenu')
         }
       }
     },
     {
       type: 'checkbox',
-      label: '虚拟网卡',
+      label: t('tray.tun'),
       accelerator: triggerTunShortcut,
       checked: tun?.enable ?? false,
       click: async (item): Promise<void> => {
         const enable = item.checked
-        if (enable) {
-          await patchControledMihomoConfig({ tun: { enable }, dns: { enable: true } })
-        } else {
-          await patchControledMihomoConfig({ tun: { enable } })
+        try {
+          if (enable) {
+            await patchControledMihomoConfig({ tun: { enable }, dns: { enable: true } })
+          } else {
+            await patchControledMihomoConfig({ tun: { enable } })
+          }
+          mainWindow?.webContents.send('controledMihomoConfigUpdated')
+          floatingWindow?.webContents.send('controledMihomoConfigUpdated')
+          await restartCore()
+        } catch {
+          // ignore
+        } finally {
+          ipcMain.emit('updateTrayMenu')
         }
-        mainWindow?.webContents.send('controledMihomoConfigUpdated')
-        await restartCore()
-        ipcMain.emit('updateTrayMenu')
       }
     },
     ...groupsMenu,
     { type: 'separator' },
     {
       type: 'submenu',
-      label: '打开目录',
+      label: t('tray.profiles'),
+      submenu: items.map((item) => {
+        return {
+          type: 'radio',
+          label: item.name,
+          checked: item.id === current,
+          click: async (): Promise<void> => {
+            if (item.id === current) return
+            await changeCurrentProfile(item.id)
+            mainWindow?.webContents.send('profileConfigUpdated')
+            ipcMain.emit('updateTrayMenu')
+          }
+        }
+      })
+    },
+    { type: 'separator' },
+    {
+      type: 'submenu',
+      label: t('tray.openDirectories.title'),
       submenu: [
         {
           type: 'normal',
-          label: '应用目录',
+          label: t('tray.openDirectories.appDir'),
           click: (): Promise<string> => shell.openPath(dataDir())
         },
         {
           type: 'normal',
-          label: '工作目录',
+          label: t('tray.openDirectories.workDir'),
           click: (): Promise<string> => shell.openPath(mihomoWorkDir())
         },
         {
           type: 'normal',
-          label: '内核目录',
+          label: t('tray.openDirectories.coreDir'),
           click: (): Promise<string> => shell.openPath(mihomoCoreDir())
         },
         {
           type: 'normal',
-          label: '日志目录',
+          label: t('tray.openDirectories.logDir'),
           click: (): Promise<string> => shell.openPath(logDir())
         }
       ]
     },
-    {
-      id: 'copyenv',
-      label: '复制环境变量',
-      type: 'normal',
-      click: copyEnv
-    },
+    envType.length > 1
+      ? {
+          type: 'submenu',
+          label: t('tray.copyEnv'),
+          submenu: envType.map((type) => {
+            return {
+              id: type,
+              label: type,
+              type: 'normal',
+              click: async (): Promise<void> => {
+                await copyEnv(type)
+              }
+            }
+          })
+        }
+      : {
+          id: 'copyenv',
+          label: t('tray.copyEnv'),
+          type: 'normal',
+          click: async (): Promise<void> => {
+            await copyEnv(envType[0])
+          }
+        },
     { type: 'separator' },
     {
       id: 'quitWithoutCore',
-      label: '轻量模式',
+      label: t('actions.lightMode.button'),
       type: 'normal',
       accelerator: quitWithoutCoreShortcut,
       click: quitWithoutCore
     },
     {
       id: 'restart',
-      label: '重启应用',
+      label: t('actions.restartApp'),
       type: 'normal',
       accelerator: restartAppShortcut,
       click: (): void => {
@@ -215,7 +281,7 @@ const buildContextMenu = async (): Promise<Menu> => {
     },
     {
       id: 'quit',
-      label: '退出应用',
+      label: t('actions.quit.button'),
       type: 'normal',
       accelerator: 'CommandOrControl+Q',
       click: (): void => app.quit()
@@ -251,11 +317,7 @@ export async function createTray(): Promise<void> {
       tray?.setImage(image)
     })
     tray?.addListener('right-click', async () => {
-      if (mainWindow?.isVisible()) {
-        mainWindow?.close()
-      } else {
-        showMainWindow()
-      }
+      triggerMainWindow()
     })
     tray?.addListener('click', async () => {
       await updateTrayMenu()
@@ -263,11 +325,7 @@ export async function createTray(): Promise<void> {
   }
   if (process.platform === 'win32') {
     tray?.addListener('click', () => {
-      if (mainWindow?.isVisible()) {
-        mainWindow?.close()
-      } else {
-        showMainWindow()
-      }
+      triggerMainWindow()
     })
     tray?.addListener('right-click', async () => {
       await updateTrayMenu()
@@ -275,11 +333,7 @@ export async function createTray(): Promise<void> {
   }
   if (process.platform === 'linux') {
     tray?.addListener('click', () => {
-      if (mainWindow?.isVisible()) {
-        mainWindow?.close()
-      } else {
-        showMainWindow()
-      }
+      triggerMainWindow()
     })
     ipcMain.on('updateTrayMenu', async () => {
       await updateTrayMenu()
@@ -295,12 +349,11 @@ async function updateTrayMenu(): Promise<void> {
   }
 }
 
-export async function copyEnv(): Promise<void> {
-  const defaultType = process.platform === 'win32' ? 'powershell' : 'bash'
+export async function copyEnv(type: 'bash' | 'cmd' | 'powershell'): Promise<void> {
   const { 'mixed-port': mixedPort = 7890 } = await getControledMihomoConfig()
-  const { envType = defaultType, sysProxy } = await getAppConfig()
+  const { sysProxy } = await getAppConfig()
   const { host } = sysProxy
-  switch (envType) {
+  switch (type) {
     case 'bash': {
       clipboard.writeText(
         `export https_proxy=http://${host || '127.0.0.1'}:${mixedPort} http_proxy=http://${host || '127.0.0.1'}:${mixedPort} all_proxy=http://${host || '127.0.0.1'}:${mixedPort}`
@@ -320,4 +373,17 @@ export async function copyEnv(): Promise<void> {
       break
     }
   }
+}
+
+export async function showTrayIcon(): Promise<void> {
+  if (!tray) {
+    await createTray()
+  }
+}
+
+export async function closeTrayIcon(): Promise<void> {
+  if (tray) {
+    tray.destroy()
+  }
+  tray = null
 }

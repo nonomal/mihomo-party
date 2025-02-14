@@ -1,21 +1,28 @@
-import { Button, Card, CardBody, CardFooter } from '@nextui-org/react'
+import { Button, Card, CardBody, CardFooter, Tooltip } from '@heroui/react'
 import { calcTraffic } from '@renderer/utils/calc'
 import { mihomoVersion, restartCore } from '@renderer/utils/ipc'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { IoMdRefresh } from 'react-icons/io'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import PubSub from 'pubsub-js'
 import useSWR from 'swr'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { LuCpu } from 'react-icons/lu'
+import { useTranslation } from 'react-i18next'
 
-const MihomoCoreCard: React.FC = () => {
+interface Props {
+  iconOnly?: boolean
+}
+
+const MihomoCoreCard: React.FC<Props> = (props) => {
   const { appConfig } = useAppConfig()
+  const { iconOnly } = props
   const { mihomoCoreCardStatus = 'col-span-2' } = appConfig || {}
   const { data: version, mutate } = useSWR('mihomoVersion', mihomoVersion)
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/mihomo')
   const {
     attributes,
@@ -29,6 +36,7 @@ const MihomoCoreCard: React.FC = () => {
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
   const [mem, setMem] = useState(0)
+  const { t } = useTranslation()
 
   useEffect(() => {
     const token = PubSub.subscribe('mihomo-core-changed', () => {
@@ -43,6 +51,26 @@ const MihomoCoreCard: React.FC = () => {
     }
   }, [])
 
+  if (iconOnly) {
+    return (
+      <div className={`${mihomoCoreCardStatus} flex justify-center`}>
+        <Tooltip content={t('sider.cards.core')} placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/mihomo')
+            }}
+          >
+            <LuCpu className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -51,7 +79,7 @@ const MihomoCoreCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={mihomoCoreCardStatus}
+      className={`${mihomoCoreCardStatus} mihomo-core-card`}
     >
       {mihomoCoreCardStatus === 'col-span-2' ? (
         <Card
@@ -69,7 +97,7 @@ const MihomoCoreCard: React.FC = () => {
               className="flex justify-between h-[32px]"
             >
               <h3
-                className={`text-md font-bold leading-[32px] ${match ? 'text-white' : 'text-foreground'} `}
+                className={`text-md font-bold leading-[32px] ${match ? 'text-primary-foreground' : 'text-foreground'} `}
               >
                 {version?.version ?? '-'}
               </h3>
@@ -90,16 +118,16 @@ const MihomoCoreCard: React.FC = () => {
                 }}
               >
                 <IoMdRefresh
-                  className={`${match ? 'text-white' : 'text-foreground'} text-[24px]`}
+                  className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px]`}
                 />
               </Button>
             </div>
           </CardBody>
           <CardFooter className="pt-1">
             <div
-              className={`flex justify-between w-full text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}
+              className={`flex justify-between w-full text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
             >
-              <h4>内核设置</h4>
+              <h4>{t('sider.cards.core')}</h4>
               <h4>{calcTraffic(mem)}</h4>
             </div>
           </CardFooter>
@@ -122,14 +150,16 @@ const MihomoCoreCard: React.FC = () => {
               >
                 <LuCpu
                   color="default"
-                  className={`${match ? 'text-white' : 'text-foreground'} text-[24px] font-bold`}
+                  className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px] font-bold`}
                 />
               </Button>
             </div>
           </CardBody>
           <CardFooter className="pt-1">
-            <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>
-              内核设置
+            <h3
+              className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+            >
+              {t('sider.cards.core')}
             </h3>
           </CardFooter>
         </Card>

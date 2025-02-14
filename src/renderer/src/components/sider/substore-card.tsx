@@ -1,13 +1,23 @@
-import { Button, Card, CardBody, CardFooter } from '@nextui-org/react'
-import { useLocation } from 'react-router-dom'
+import { Button, Card, CardBody, CardFooter, Tooltip } from '@heroui/react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import SubStoreIcon from '../base/substore-icon'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
-const SubStoreCard: React.FC = () => {
+import React from 'react'
+import { useTranslation } from 'react-i18next'
+
+interface Props {
+  iconOnly?: boolean
+}
+
+const SubStoreCard: React.FC<Props> = (props) => {
+  const { t } = useTranslation()
   const { appConfig } = useAppConfig()
+  const { iconOnly } = props
   const { substoreCardStatus = 'col-span-1', useSubStore = true } = appConfig || {}
   const location = useLocation()
+  const navigate = useNavigate()
   const match = location.pathname.includes('/substore')
   const {
     attributes,
@@ -20,6 +30,27 @@ const SubStoreCard: React.FC = () => {
     id: 'substore'
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
+
+  if (iconOnly) {
+    return (
+      <div className={`${substoreCardStatus} ${!useSubStore ? 'hidden' : ''} flex justify-center`}>
+        <Tooltip content={t('sider.cards.substore')} placement="right">
+          <Button
+            size="sm"
+            isIconOnly
+            color={match ? 'primary' : 'default'}
+            variant={match ? 'solid' : 'light'}
+            onPress={() => {
+              navigate('/substore')
+            }}
+          >
+            <SubStoreIcon className="text-[20px]" />
+          </Button>
+        </Tooltip>
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -28,7 +59,7 @@ const SubStoreCard: React.FC = () => {
         transition,
         zIndex: isDragging ? 'calc(infinity)' : undefined
       }}
-      className={`${substoreCardStatus} ${!useSubStore ? 'hidden' : ''}`}
+      className={`${substoreCardStatus} ${!useSubStore ? 'hidden' : ''} substore-card`}
     >
       <Card
         ref={setNodeRef}
@@ -46,14 +77,16 @@ const SubStoreCard: React.FC = () => {
               color="default"
             >
               <SubStoreIcon
-                className={`${match ? 'text-white' : 'text-foreground'} text-[24px] font-bold`}
+                className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px] font-bold`}
               />
             </Button>
           </div>
         </CardBody>
         <CardFooter className="pt-1">
-          <h3 className={`text-md font-bold ${match ? 'text-white' : 'text-foreground'}`}>
-            Sub-Store
+          <h3
+            className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+          >
+            {t('sider.cards.substore')}
           </h3>
         </CardFooter>
       </Card>

@@ -4,7 +4,7 @@ pkgver=0.2.2
 pkgrel=1
 pkgdesc="Another Mihomo GUI."
 arch=('x86_64' 'aarch64')
-url="https://github.com/pompurin404/mihomo-party"
+url="https://github.com/mihomo-party-org/mihomo-party"
 license=('GPL3')
 conflicts=("$_pkgname" "$_pkgname-git" "$_pkgname-bin" "$_pkgname-electron")
 depends=('electron' 'gtk3' 'libnotify' 'nss' 'libxss' 'libxtst' 'xdg-utils' 'at-spi2-core' 'util-linux-libs' 'libsecret')
@@ -27,10 +27,9 @@ package() {
     asar extract $srcdir/opt/mihomo-party/resources/app.asar ${pkgdir}/opt/mihomo-party
     cp -r $srcdir/opt/mihomo-party/resources/sidecar ${pkgdir}/opt/mihomo-party/resources/
     cp -r $srcdir/opt/mihomo-party/resources/files ${pkgdir}/opt/mihomo-party/resources/
-    chmod +x ${pkgdir}/opt/mihomo-party/resources/sidecar/mihomo
-    chmod +x ${pkgdir}/opt/mihomo-party/resources/sidecar/mihomo-alpha
-    cd ${pkgdir}/../..
-	install -Dm755 "${_pkgname}.sh" "${pkgdir}/usr/bin/${_pkgname}"
+    chmod +sx ${pkgdir}/opt/mihomo-party/resources/sidecar/mihomo
+    chmod +sx ${pkgdir}/opt/mihomo-party/resources/sidecar/mihomo-alpha
+    install -Dm755 "${srcdir}/${_pkgname}.sh" "${pkgdir}/usr/bin/${_pkgname}"
     install -Dm644 "${_pkgname}.desktop" "${pkgdir}/usr/share/applications/${_pkgname}.desktop"
     install -Dm644 "${pkgdir}/opt/mihomo-party/resources/icon.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/${_pkgname}.png"
 

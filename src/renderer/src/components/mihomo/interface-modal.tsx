@@ -6,14 +6,18 @@ import {
   ModalFooter,
   Button,
   Snippet
-} from '@nextui-org/react'
+} from '@heroui/react'
 import React, { useEffect, useState } from 'react'
 import { getInterfaces } from '@renderer/utils/ipc'
+import { useTranslation } from 'react-i18next'
+
 interface Props {
   onClose: () => void
 }
+
 const InterfaceModal: React.FC<Props> = (props) => {
   const { onClose } = props
+  const { t } = useTranslation()
   const [info, setInfo] = useState<Record<string, NetworkInterfaceInfo[]>>({})
   const getInfo = async (): Promise<void> => {
     setInfo(await getInterfaces())
@@ -33,7 +37,7 @@ const InterfaceModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">网络信息</ModalHeader>
+        <ModalHeader className="flex app-drag">{t('mihomo.interface.title')}</ModalHeader>
         <ModalBody>
           {Object.entries(info).map(([key, value]) => {
             return (
@@ -56,8 +60,8 @@ const InterfaceModal: React.FC<Props> = (props) => {
           })}
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            关闭
+          <Button size="sm" variant="light" onPress={onClose}>
+            {t('common.close')}
           </Button>
         </ModalFooter>
       </ModalContent>

@@ -7,7 +7,7 @@ import pac from 'types-pac/pac.d.ts?raw'
 import { useTheme } from 'next-themes'
 import { nanoid } from 'nanoid'
 import React from 'react'
-type Language = 'yaml' | 'javascript' | 'json'
+type Language = 'yaml' | 'javascript' | 'css' | 'json' | 'text'
 
 interface Props {
   value: string
@@ -29,7 +29,53 @@ const monacoInitialization = (): void => {
         uri: 'http://example.com/meta-json-schema.json',
         fileMatch: ['**/*.clash.yaml'],
         // @ts-ignore // type JSONSchema7
-        schema: metaSchema
+        schema: {
+          ...metaSchema,
+          patternProperties: {
+            '\\+rules': {
+              type: 'array',
+              $ref: '#/definitions/rules',
+              description: '“+”开头表示将内容插入到原数组前面'
+            },
+            'rules\\+': {
+              type: 'array',
+              $ref: '#/definitions/rules',
+              description: '“+”结尾表示将内容追加到原数组后面'
+            },
+            '\\+proxies': {
+              type: 'array',
+              $ref: '#/definitions/proxies',
+              description: '“+”开头表示将内容插入到原数组前面'
+            },
+            'proxies\\+': {
+              type: 'array',
+              $ref: '#/definitions/proxies',
+              description: '“+”结尾表示将内容追加到原数组后面'
+            },
+            '\\+proxy-groups': {
+              type: 'array',
+              $ref: '#/definitions/proxy-groups',
+              description: '“+”开头表示将内容插入到原数组前面'
+            },
+            'proxy-groups\\+': {
+              type: 'array',
+              $ref: '#/definitions/proxy-groups',
+              description: '“+”结尾表示将内容追加到原数组后面'
+            },
+            '^\\+': {
+              type: 'array',
+              description: '“+”开头表示将内容插入到原数组前面'
+            },
+            '\\+$': {
+              type: 'array',
+              description: '“+”结尾表示将内容追加到原数组后面'
+            },
+            '!$': {
+              type: 'object',
+              description: '“!”结尾表示强制覆盖该项而不进行递归合并'
+            }
+          }
+        }
       }
     ]
   })
@@ -43,7 +89,7 @@ export const BaseEditor: React.FC<Props> = (props) => {
   const trueTheme = theme === 'system' ? systemTheme : theme
   const { value, readOnly = false, language, onChange } = props
 
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>()
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>(undefined)
 
   const editorWillMount = (): void => {
     monacoInitialization()
@@ -59,7 +105,9 @@ export const BaseEditor: React.FC<Props> = (props) => {
 
   useEffect(() => {
     window.onresize = (): void => {
-      editorRef.current?.layout()
+      setTimeout(() => {
+        editorRef.current?.layout()
+      }, 0)
     }
     return (): void => {
       window.onresize = null
@@ -77,9 +125,9 @@ export const BaseEditor: React.FC<Props> = (props) => {
       options={{
         tabSize: ['yaml', 'javascript', 'json'].includes(language) ? 2 : 4, // 根据语言类型设置缩进大小
         minimap: {
-          enabled: document.documentElement.clientWidth >= 1500 // 超过一定宽度显示minimap滚动条
+          enabled: document.documentElement.clientWidth >= 1500 // 超过一定宽度显示 minimap 滚动条
         },
-        mouseWheelZoom: true, // 按住Ctrl滚轮调节缩放比例
+        mouseWheelZoom: true, // 按住 Ctrl 滚轮调节缩放比例
         readOnly: readOnly, // 只读模式
         renderValidationDecorations: 'on', // 只读模式下显示校验信息
         quickSuggestions: {
@@ -93,6 +141,7 @@ export const BaseEditor: React.FC<Props> = (props) => {
       }}
       editorWillMount={editorWillMount}
       editorDidMount={editorDidMount}
+      editorWillUnmount={(): void => { }}
       onChange={onChange}
     />
   )

@@ -1,4 +1,4 @@
-import { Button, Tab, Input, Switch, Tabs, Divider } from '@nextui-org/react'
+import { Button, Tab, Input, Switch, Tabs, Divider } from '@heroui/react'
 import BasePage from '@renderer/components/base/base-page'
 import { MdDeleteForever } from 'react-icons/md'
 import SettingCard from '@renderer/components/base/base-setting-card'
@@ -7,8 +7,10 @@ import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-c
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { restartCore } from '@renderer/utils/ipc'
 import React, { Key, ReactNode, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const DNS: React.FC = () => {
+  const { t } = useTranslation()
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
   const { appConfig, patchAppConfig } = useAppConfig()
   const { nameserverPolicy, useNameserverPolicy } = appConfig || {}
@@ -28,11 +30,13 @@ const DNS: React.FC = () => {
     'use-hosts': useHosts = false,
     'use-system-hosts': useSystemHosts = false,
     'respect-rules': respectRules = false,
+    'default-nameserver': defaultNameserver = ['tls://223.5.5.5'],
     nameserver = ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
     'proxy-server-nameserver': proxyServerNameserver = [
       'https://doh.pub/dns-query',
       'https://dns.alidns.com/dns-query'
-    ]
+    ],
+    'direct-nameserver': directNameserver = []
   } = dns || {}
   const [changed, setChanged] = useState(false)
   const [values, originSetValues] = useState({
@@ -43,8 +47,10 @@ const DNS: React.FC = () => {
     fakeIPFilter,
     useSystemHosts,
     respectRules,
+    defaultNameserver,
     nameserver,
     proxyServerNameserver,
+    directNameserver,
     useNameserverPolicy,
     nameserverPolicy: Object.entries(nameserverPolicy || {}).map(([domain, value]) => ({
       domain,
@@ -91,7 +97,7 @@ const DNS: React.FC = () => {
             size="sm"
             variant="flat"
             color="warning"
-            onClick={() => handleListChange(type, '', index)}
+            onPress={() => handleListChange(type, '', index)}
           >
             <MdDeleteForever className="text-lg" />
           </Button>
@@ -128,7 +134,7 @@ const DNS: React.FC = () => {
 
   return (
     <BasePage
-      title="DNS 设置"
+      title={t('dns.title')}
       header={
         changed && (
           <Button
@@ -147,10 +153,12 @@ const DNS: React.FC = () => {
                 'use-hosts': values.useHosts,
                 'use-system-hosts': values.useSystemHosts,
                 'respect-rules': values.respectRules,
+                'default-nameserver': values.defaultNameserver,
                 nameserver: values.nameserver,
                 'proxy-server-nameserver': values.proxyServerNameserver,
-                fallback: [],
-                'fallback-filter': {}
+                'direct-nameserver': values.directNameserver,
+                fallback: undefined,
+                'fallback-filter': undefined
               }
               if (values.useNameserverPolicy) {
                 dnsConfig['nameserver-policy'] = Object.fromEntries(
@@ -163,39 +171,40 @@ const DNS: React.FC = () => {
               })
             }}
           >
-            保存
+            {t('common.save')}
           </Button>
         )
       }
     >
       <SettingCard>
-        <SettingItem title="域名映射模式" divider>
+        <SettingItem title={t('dns.enhancedMode.title')} divider>
           <Tabs
             size="sm"
             color="primary"
             selectedKey={values.enhancedMode}
             onSelectionChange={(key: Key) => setValues({ ...values, enhancedMode: key as DnsMode })}
           >
-            <Tab key="fake-ip" title="虚假 IP" />
-            <Tab key="redir-host" title="真实 IP" />
-            <Tab key="normal" title="取消映射" />
+            <Tab key="fake-ip" title={t('dns.enhancedMode.fakeIp')} />
+            <Tab key="redir-host" title={t('dns.enhancedMode.redirHost')} />
+            <Tab key="normal" title={t('dns.enhancedMode.normal')} />
           </Tabs>
         </SettingItem>
         {values.enhancedMode === 'fake-ip' ? (
           <>
-            <SettingItem title="回应范围" divider>
+            <SettingItem title={t('dns.fakeIp.range')} divider>
               <Input
                 size="sm"
                 className="w-[50%]"
                 value={values.fakeIPRange}
+                placeholder={t('dns.fakeIp.rangePlaceholder')}
                 onValueChange={(v) => {
                   setValues({ ...values, fakeIPRange: v })
                 }}
               />
             </SettingItem>
             <div className="flex flex-col items-stretch">
-              <h3>真实 IP 回应</h3>
-              {renderListInputs('fakeIPFilter', '例: +.lan')}
+              <h3>{t('dns.fakeIp.filter')}</h3>
+              {renderListInputs('fakeIPFilter', t('dns.fakeIp.filterPlaceholder'))}
             </div>
             <Divider className="my-2" />
           </>
@@ -209,7 +218,7 @@ const DNS: React.FC = () => {
             }}
           />
         </SettingItem>
-        <SettingItem title="连接遵守规则" divider>
+        <SettingItem title={t('dns.respectRules')} divider>
           <Switch
             size="sm"
             isSelected={values.respectRules}
@@ -220,16 +229,26 @@ const DNS: React.FC = () => {
         </SettingItem>
 
         <div className="flex flex-col items-stretch">
-          <h3>代理节点域名解析</h3>
-          {renderListInputs('proxyServerNameserver', '例: tls://223.5.5.5')}
+          <h3>{t('dns.defaultNameserver')}</h3>
+          {renderListInputs('defaultNameserver', t('dns.defaultNameserverPlaceholder'))}
         </div>
         <Divider className="my-2" />
         <div className="flex flex-col items-stretch">
-          <h3>DNS 服务器</h3>
-          {renderListInputs('nameserver', '例: tls://223.5.5.5')}
+          <h3>{t('dns.proxyServerNameserver')}</h3>
+          {renderListInputs('proxyServerNameserver', t('dns.proxyServerNameserverPlaceholder'))}
         </div>
         <Divider className="my-2" />
-        <SettingItem title="覆盖DNS策略" divider>
+        <div className="flex flex-col items-stretch">
+          <h3>{t('dns.nameserver')}</h3>
+          {renderListInputs('nameserver', t('dns.nameserverPlaceholder'))}
+        </div>
+        <Divider className="my-2" />
+        <div className="flex flex-col items-stretch">
+          <h3>{t('dns.directNameserver')}</h3>
+          {renderListInputs('directNameserver', t('dns.directNameserverPlaceholder'))}
+        </div>
+        <Divider className="my-2" />
+        <SettingItem title={t('dns.nameserverPolicy.title')} divider>
           <Switch
             size="sm"
             isSelected={values.useNameserverPolicy}
@@ -241,7 +260,7 @@ const DNS: React.FC = () => {
         {values.useNameserverPolicy && (
           <div className="flex flex-col items-stretch">
             <div className="flex flex-col items-stretch">
-              <h3 className="mb-2"></h3>
+              <h3 className="mb-2">{t('dns.nameserverPolicy.list')}</h3>
               {[...values.nameserverPolicy, { domain: '', value: '' }].map(
                 ({ domain, value }, index) => (
                   <div key={index} className="flex mb-2">
@@ -249,7 +268,7 @@ const DNS: React.FC = () => {
                       <Input
                         size="sm"
                         fullWidth
-                        placeholder="域名"
+                        placeholder={t('dns.nameserverPolicy.domainPlaceholder')}
                         value={domain}
                         onValueChange={(v) =>
                           handleSubkeyChange(
@@ -266,7 +285,7 @@ const DNS: React.FC = () => {
                       <Input
                         size="sm"
                         fullWidth
-                        placeholder="DNS 服务器"
+                        placeholder={t('dns.nameserverPolicy.serverPlaceholder')}
                         value={Array.isArray(value) ? value.join(',') : value}
                         onValueChange={(v) =>
                           handleSubkeyChange('nameserverPolicy', domain, v, index)
@@ -278,7 +297,7 @@ const DNS: React.FC = () => {
                           color="warning"
                           variant="flat"
                           className="ml-2"
-                          onClick={() => handleSubkeyChange('nameserverPolicy', '', '', index)}
+                          onPress={() => handleSubkeyChange('nameserverPolicy', '', '', index)}
                         >
                           <MdDeleteForever className="text-lg" />
                         </Button>
@@ -290,7 +309,7 @@ const DNS: React.FC = () => {
             </div>
           </div>
         )}
-        <SettingItem title="使用系统 Hosts" divider>
+        <SettingItem title={t('dns.systemHosts.title')} divider>
           <Switch
             size="sm"
             isSelected={values.useSystemHosts}
@@ -299,7 +318,7 @@ const DNS: React.FC = () => {
             }}
           />
         </SettingItem>
-        <SettingItem title="自定义 Hosts">
+        <SettingItem title={t('dns.customHosts.title')}>
           <Switch
             size="sm"
             isSelected={values.useHosts}
@@ -310,14 +329,14 @@ const DNS: React.FC = () => {
         </SettingItem>
         {values.useHosts && (
           <div className="flex flex-col items-stretch">
-            <h3 className="mb-2"></h3>
+            <h3 className="mb-2">{t('dns.customHosts.list')}</h3>
             {[...values.hosts, { domain: '', value: '' }].map(({ domain, value }, index) => (
               <div key={index} className="flex mb-2">
                 <div className="flex-[4]">
                   <Input
                     size="sm"
                     fullWidth
-                    placeholder="域名"
+                    placeholder={t('dns.customHosts.domainPlaceholder')}
                     value={domain}
                     onValueChange={(v) =>
                       handleSubkeyChange(
@@ -334,7 +353,7 @@ const DNS: React.FC = () => {
                   <Input
                     size="sm"
                     fullWidth
-                    placeholder="域名或 IP"
+                    placeholder={t('dns.customHosts.valuePlaceholder')}
                     value={Array.isArray(value) ? value.join(',') : value}
                     onValueChange={(v) => handleSubkeyChange('hosts', domain, v, index)}
                   />
@@ -344,7 +363,7 @@ const DNS: React.FC = () => {
                       color="warning"
                       variant="flat"
                       className="ml-2"
-                      onClick={() => handleSubkeyChange('hosts', '', '', index)}
+                      onPress={() => handleSubkeyChange('hosts', '', '', index)}
                     >
                       <MdDeleteForever className="text-lg" />
                     </Button>

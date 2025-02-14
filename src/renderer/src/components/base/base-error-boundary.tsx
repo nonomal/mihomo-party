@@ -1,19 +1,22 @@
-import { Button } from '@nextui-org/react'
+import { Button } from '@heroui/react'
 import { ReactNode } from 'react'
 import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
+import { useTranslation } from 'react-i18next'
 
 const ErrorFallback = ({ error }: FallbackProps): JSX.Element => {
+  const { t } = useTranslation()
+  
   return (
     <div className="p-4">
       <h2 className="my-2 text-lg font-bold">
-        {'应用崩溃了 :( 请将以下信息提交给开发者以排查错误'}
+        {t('common.error.appCrash')}
       </h2>
 
       <Button
         size="sm"
         color="primary"
         variant="flat"
-        onPress={() => open('https://github.com/pompurin404/mihomo-party/issues/new/choose')}
+        onPress={() => open('https://github.com/mihomo-party-org/mihomo-party/issues/new/choose')}
       >
         GitHub
       </Button>
@@ -22,7 +25,7 @@ const ErrorFallback = ({ error }: FallbackProps): JSX.Element => {
         color="primary"
         variant="flat"
         className="ml-2"
-        onPress={() => open('https://t.me/mihomo_party')}
+        onPress={() => open('https://t.me/mihomo_party_group')}
       >
         Telegram
       </Button>
@@ -35,7 +38,7 @@ const ErrorFallback = ({ error }: FallbackProps): JSX.Element => {
           navigator.clipboard.writeText('```\n' + error.message + '\n' + error.stack + '\n```')
         }
       >
-        复制报错信息
+        {t('common.error.copyErrorMessage')}
       </Button>
 
       <p className="my-2">{error.message}</p>

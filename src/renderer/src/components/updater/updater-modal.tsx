@@ -6,19 +6,23 @@ import {
   ModalFooter,
   Button,
   Code
-} from '@nextui-org/react'
+} from '@heroui/react'
 import ReactMarkdown from 'react-markdown'
 import React, { useState } from 'react'
 import { downloadAndInstallUpdate } from '@renderer/utils/ipc'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   version: string
   changelog: string
   onClose: () => void
 }
+
 const UpdaterModal: React.FC<Props> = (props) => {
   const { version, changelog, onClose } = props
   const [downloading, setDownloading] = useState(false)
+  const { t } = useTranslation()
+
   const onUpdate = async (): Promise<void> => {
     try {
       await downloadAndInstallUpdate(version)
@@ -37,23 +41,24 @@ const UpdaterModal: React.FC<Props> = (props) => {
       scrollBehavior="inside"
     >
       <ModalContent className="h-full w-[calc(100%-100px)]">
-        <ModalHeader className="flex justify-between">
-          <div>v{version} 版本就绪</div>
+        <ModalHeader className="flex justify-between app-drag">
+          <div>{t('common.updater.versionReady', { version })}</div>
           <Button
             color="primary"
             size="sm"
-            className="flex"
+            className="flex app-nodrag"
             onPress={() => {
-              open(`https://github.com/pompurin404/mihomo-party/releases/tag/v${version}`)
+              open(`https://github.com/mihomo-party-org/mihomo-party/releases/tag/v${version}`)
             }}
           >
-            前往下载
+            {t('common.updater.goToDownload')}
           </Button>
         </ModalHeader>
         <ModalBody className="h-full">
           <ReactMarkdown
             className="markdown-body select-text"
             components={{
+              a: ({ ...props }) => <a target="_blank" className="text-primary" {...props} />,
               code: ({ children }) => <Code size="sm">{children}</Code>,
               h3: ({ ...props }) => <h3 className="text-lg font-bold" {...props} />,
               li: ({ children }) => <li className="list-disc list-inside">{children}</li>
@@ -63,10 +68,11 @@ const UpdaterModal: React.FC<Props> = (props) => {
           </ReactMarkdown>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            取消
+          <Button size="sm" variant="light" onPress={onClose}>
+            {t('common.cancel')}
           </Button>
           <Button
+            size="sm"
             color="primary"
             isLoading={downloading}
             onPress={async () => {
@@ -81,7 +87,7 @@ const UpdaterModal: React.FC<Props> = (props) => {
               }
             }}
           >
-            更新
+            {t('common.updater.update')}
           </Button>
         </ModalFooter>
       </ModalContent>

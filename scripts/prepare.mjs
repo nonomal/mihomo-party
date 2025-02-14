@@ -241,6 +241,11 @@ const resolveMmdb = () =>
     file: 'country.mmdb',
     downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country-lite.mmdb`
   })
+const resolveMetadb = () =>
+  resolveResource({
+    file: 'geoip.metadb',
+    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb`
+  })
 const resolveGeosite = () =>
   resolveResource({
     file: 'geosite.dat',
@@ -254,7 +259,7 @@ const resolveGeoIP = () =>
 const resolveASN = () =>
   resolveResource({
     file: 'ASN.mmdb',
-    downloadURL: `https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb`
+    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb`
   })
 const resolveEnableLoopback = () =>
   resolveResource({
@@ -264,18 +269,50 @@ const resolveEnableLoopback = () =>
 const resolveSysproxy = () =>
   resolveResource({
     file: 'sysproxy.exe',
-    downloadURL: `https://github.com/pompurin404/sysproxy/releases/download/${arch}/sysproxy.exe`
+    downloadURL: `https://github.com/mihomo-party-org/sysproxy/releases/download/${arch}/sysproxy.exe`
   })
 const resolveRunner = () =>
   resolveResource({
     file: 'mihomo-party-run.exe',
-    downloadURL: `https://github.com/pompurin404/mihomo-party-run/releases/download/${arch}/mihomo-party-run.exe`
+    downloadURL: `https://github.com/mihomo-party-org/mihomo-party-run/releases/download/${arch}/mihomo-party-run.exe`
+  })
+
+const resolveMonitor = async () => {
+  const tempDir = path.join(TEMP_DIR, 'TrafficMonitor')
+  const tempZip = path.join(tempDir, `${arch}.zip`)
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true })
+  }
+  await downloadFile(
+    `https://github.com/mihomo-party-org/mihomo-party-run/releases/download/monitor/${arch}.zip`,
+    tempZip
+  )
+  const zip = new AdmZip(tempZip)
+  const resDir = path.join(cwd, 'extra', 'files')
+  const targetPath = path.join(resDir, 'TrafficMonitor')
+  if (fs.existsSync(targetPath)) {
+    fs.rmSync(targetPath, { recursive: true })
+  }
+  zip.extractAllTo(targetPath, true)
+
+  console.log(`[INFO]: TrafficMonitor finished`)
+}
+
+const resolve7zip = () =>
+  resolveResource({
+    file: '7za.exe',
+    downloadURL: `https://github.com/develar/7zip-bin/raw/master/win/${arch}/7za.exe`
   })
 const resolveSubstore = () =>
   resolveResource({
     file: 'sub-store.bundle.js',
     downloadURL:
       'https://github.com/sub-store-org/Sub-Store/releases/latest/download/sub-store.bundle.js'
+  })
+const resolveHelper = () =>
+  resolveResource({
+    file: 'party.mihomo.helper',
+    downloadURL: `https://github.com/mihomo-party-org/mihomo-party-helper/releases/download/${arch}/party.mihomo.helper`
   })
 const resolveSubstoreFrontend = async () => {
   const tempDir = path.join(TEMP_DIR, 'substore-frontend')
@@ -324,6 +361,7 @@ const tasks = [
     retry: 5
   },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },
+  { name: 'metadb', func: resolveMetadb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
   { name: 'geoip', func: resolveGeoIP, retry: 5 },
   { name: 'asn', func: resolveASN, retry: 5 },
@@ -351,6 +389,12 @@ const tasks = [
     winOnly: true
   },
   {
+    name: 'monitor',
+    func: resolveMonitor,
+    retry: 5,
+    winOnly: true
+  },
+  {
     name: 'substore',
     func: resolveSubstore,
     retry: 5
@@ -359,6 +403,18 @@ const tasks = [
     name: 'substorefrontend',
     func: resolveSubstoreFrontend,
     retry: 5
+  },
+  {
+    name: '7zip',
+    func: resolve7zip,
+    retry: 5,
+    winOnly: true
+  },
+  {
+    name: 'helper',
+    func: resolveHelper,
+    retry: 5,
+    darwinOnly: true
   }
 ]
 
@@ -368,6 +424,7 @@ async function runTask() {
   if (task.winOnly && platform !== 'win32') return runTask()
   if (task.linuxOnly && platform !== 'linux') return runTask()
   if (task.unixOnly && platform === 'win32') return runTask()
+  if (task.darwinOnly && platform !== 'darwin') return runTask()
 
   for (let i = 0; i < task.retry; i++) {
     try {

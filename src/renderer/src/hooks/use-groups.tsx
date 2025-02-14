@@ -12,15 +12,18 @@ const GroupsContext = createContext<GroupsContextType | undefined>(undefined)
 export const GroupsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { data: groups, mutate } = useSWR<IMihomoMixedGroup[]>('mihomoGroups', mihomoGroups, {
     errorRetryInterval: 200,
-    errorRetryCount: 10
+    errorRetryCount: 10,
+    refreshInterval: 2000,
+    dedupingInterval: 1000,
+    revalidateOnFocus: false
   })
 
   React.useEffect(() => {
-    window.electron.ipcRenderer.on('coreRestart', () => {
+    window.electron.ipcRenderer.on('groupsUpdated', () => {
       mutate()
     })
     return (): void => {
-      window.electron.ipcRenderer.removeAllListeners('coreRestart')
+      window.electron.ipcRenderer.removeAllListeners('groupsUpdated')
     }
   }, [])
 

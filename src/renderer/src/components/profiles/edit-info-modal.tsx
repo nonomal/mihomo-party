@@ -1,4 +1,5 @@
 import {
+  cn,
   Modal,
   ModalContent,
   ModalHeader,
@@ -6,14 +7,20 @@ import {
   ModalFooter,
   Button,
   Input,
-  Select,
-  SelectItem,
-  Switch
-} from '@nextui-org/react'
+  Switch,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem
+} from '@heroui/react'
 import React, { useState } from 'react'
 import SettingItem from '../base/base-setting-item'
 import { useOverrideConfig } from '@renderer/hooks/use-override-config'
 import { restartCore } from '@renderer/utils/ipc'
+import { MdDeleteForever } from 'react-icons/md'
+import { FaPlus } from 'react-icons/fa6'
+import { useTranslation } from 'react-i18next'
+
 interface Props {
   item: IProfileItem
   updateProfileItem: (item: IProfileItem) => Promise<void>
@@ -24,10 +31,18 @@ const EditInfoModal: React.FC<Props> = (props) => {
   const { overrideConfig } = useOverrideConfig()
   const { items: overrideItems = [] } = overrideConfig || {}
   const [values, setValues] = useState(item)
+  const inputWidth = 'w-[400px] md:w-[400px] lg:w-[600px] xl:w-[800px]'
+  const { t } = useTranslation()
 
   const onSave = async (): Promise<void> => {
     try {
-      await updateProfileItem(values)
+      await updateProfileItem({
+        ...values,
+        override: values.override?.filter(
+          (i) =>
+            overrideItems.find((t) => t.id === i) && !overrideItems.find((t) => t.id === i)?.global
+        )
+      })
       await restartCore()
       onClose()
     } catch (e) {
@@ -38,19 +53,23 @@ const EditInfoModal: React.FC<Props> = (props) => {
   return (
     <Modal
       backdrop="blur"
-      classNames={{ backdrop: 'top-[48px]' }}
+      size="5xl"
+      classNames={{
+        backdrop: 'top-[48px]',
+        base: 'w-[600px] md:w-[600px] lg:w-[800px] xl:w-[1024px]'
+      }}
       hideCloseButton
       isOpen={true}
       onOpenChange={onClose}
       scrollBehavior="inside"
     >
       <ModalContent>
-        <ModalHeader className="flex">编辑信息</ModalHeader>
+        <ModalHeader className="flex app-drag">{t('profiles.editInfo.title')}</ModalHeader>
         <ModalBody>
-          <SettingItem title="名称">
+          <SettingItem title={t('profiles.editInfo.name')}>
             <Input
               size="sm"
-              className="w-[200px]"
+              className={cn(inputWidth)}
               value={values.name}
               onValueChange={(v) => {
                 setValues({ ...values, name: v })
@@ -59,17 +78,17 @@ const EditInfoModal: React.FC<Props> = (props) => {
           </SettingItem>
           {values.type === 'remote' && (
             <>
-              <SettingItem title="订阅地址">
+              <SettingItem title={t('profiles.editInfo.url')}>
                 <Input
                   size="sm"
-                  className="w-[200px]"
+                  className={cn(inputWidth)}
                   value={values.url}
                   onValueChange={(v) => {
                     setValues({ ...values, url: v })
                   }}
                 />
               </SettingItem>
-              <SettingItem title="使用代理更新">
+              <SettingItem title={t('profiles.editInfo.useProxy')}>
                 <Switch
                   size="sm"
                   isSelected={values.useProxy ?? false}
@@ -78,11 +97,11 @@ const EditInfoModal: React.FC<Props> = (props) => {
                   }}
                 />
               </SettingItem>
-              <SettingItem title="更新间隔（分钟）">
+              <SettingItem title={t('profiles.editInfo.interval')}>
                 <Input
                   size="sm"
                   type="number"
-                  className="w-[200px]"
+                  className={cn(inputWidth)}
                   value={values.interval?.toString() ?? ''}
                   onValueChange={(v) => {
                     setValues({ ...values, interval: parseInt(v) })
@@ -91,33 +110,75 @@ const EditInfoModal: React.FC<Props> = (props) => {
               </SettingItem>
             </>
           )}
-          <SettingItem title="覆写">
-            <Select
-              className="w-[200px]"
-              size="sm"
-              selectionMode="multiple"
-              selectedKeys={new Set(values.override || [])}
-              onSelectionChange={(v) => {
-                setValues({
-                  ...values,
-                  override: Array.from(v)
-                    .map((i) => i.toString())
-                    .filter((i) => overrideItems.find((t) => t.id === i))
-                })
-              }}
-            >
-              {overrideItems.map((i) => (
-                <SelectItem key={i.id}>{i.name}</SelectItem>
-              ))}
-            </Select>
+          <SettingItem title={t('profiles.editInfo.override.title')}>
+            <div>
+              {overrideItems
+                .filter((i) => i.global)
+                .map((i) => {
+                  return (
+                    <div className="flex mb-2" key={i.id}>
+                      <Button disabled fullWidth variant="flat" size="sm">
+                        {i.name} ({t('profiles.editInfo.override.global')})
+                      </Button>
+                    </div>
+                  )
+                })}
+              {values.override?.map((i) => {
+                if (!overrideItems.find((t) => t.id === i)) return null
+                if (overrideItems.find((t) => t.id === i)?.global) return null
+                return (
+                  <div className="flex mb-2" key={i}>
+                    <Button disabled fullWidth variant="flat" size="sm">
+                      {overrideItems.find((t) => t.id === i)?.name}
+                    </Button>
+                    <Button
+                      color="warning"
+                      variant="flat"
+                      className="ml-2"
+                      size="sm"
+                      onPress={() => {
+                        setValues({
+                          ...values,
+                          override: values.override?.filter((t) => t !== i)
+                        })
+                      }}
+                    >
+                      <MdDeleteForever className="text-lg" />
+                    </Button>
+                  </div>
+                )
+              })}
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button fullWidth size="sm" variant="flat" color="default">
+                    <FaPlus />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  emptyContent={t('profiles.editInfo.override.noAvailable')}
+                  onAction={(key) => {
+                    setValues({
+                      ...values,
+                      override: Array.from(values.override || []).concat(key.toString())
+                    })
+                  }}
+                >
+                  {overrideItems
+                    .filter((i) => !values.override?.includes(i.id) && !i.global)
+                    .map((i) => (
+                      <DropdownItem key={i.id}>{i.name}</DropdownItem>
+                    ))}
+                </DropdownMenu>
+              </Dropdown>
+            </div>
           </SettingItem>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            取消
+          <Button size="sm" variant="light" onPress={onClose}>
+            {t('common.cancel')}
           </Button>
-          <Button color="primary" onPress={onSave}>
-            保存
+          <Button size="sm" color="primary" onPress={onSave}>
+            {t('common.save')}
           </Button>
         </ModalFooter>
       </ModalContent>
